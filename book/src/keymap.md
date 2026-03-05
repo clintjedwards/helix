@@ -313,6 +313,7 @@ This layer is a kludge of mappings, mostly pickers.
 | `Y`     | Yank main selection to clipboard                                        | `yank_main_selection_to_clipboard`         |
 | `R`     | Replace selections by clipboard contents                                | `replace_selections_with_clipboard`        |
 | `/`     | Global search in workspace folder                                       | `global_search`                            |
+| `Alt-/` | Open interactive search & replace panel                                 | `search_replace`                           |
 | `?`     | Open command palette                                                    | `command_palette`                          |
 
 > 💡 Global search displays results in a fuzzy picker, use `Space + '` to bring it back up after opening a file.
@@ -448,6 +449,62 @@ selection and select the next instance of the search term. Toggling this
 mode before pressing `n` or `N` makes it possible to keep the current
 selection. Toggling it on and off during your iterative searching allows
 you to selectively add search terms to your selections.
+
+## Search & Replace
+
+Opened with `Space` `Alt-/` from normal mode. Provides an interactive panel for
+finding and replacing text in the current buffer or across the entire workspace.
+
+The panel has three sections:
+
+- **Search field** — type a pattern; results update as you type
+- **Replace field** — type the replacement text
+- **Results list** — matching lines, each toggleable for selective replacement
+
+A live diff preview on the right shows the before/after for whichever result is
+currently highlighted.
+
+### Options
+
+Toggle these from any field using the shown keybind. Active options are
+highlighted with brackets.
+
+| Option        | Keybind | Description                                                    |
+| ------        | ------- | -----------                                                    |
+| `match-case`  | `Alt-c` | Case-sensitive matching. Off = ignore capitalisation.          |
+| `regex`       | `Alt-r` | Treat the search pattern as a regular expression.              |
+| `whole-word`  | `Alt-w` | Only match the pattern when it appears as a complete word (not part of a longer word). |
+
+Scope can be toggled between the current buffer and the entire workspace with
+`Ctrl-s` from any field.
+
+### Navigation
+
+| Key           | Description                                    |
+| -----         | -----------                                    |
+| `Tab`         | Move focus: Search → Replace → Results → Search |
+| `Shift-Tab`   | Move focus in reverse                          |
+| `Escape`, `Ctrl-c` | Close the panel                           |
+
+### Results list keys
+
+Accessible after pressing `Tab` from the Replace field (or `Enter` from Search/Replace when results exist).
+
+| Key      | Description                                            |
+| -----    | -----------                                            |
+| `j`, `Down` | Move cursor down                                    |
+| `k`, `Up`   | Move cursor up                                      |
+| `Space`  | Toggle the hovered result on/off                       |
+| `a`      | Select all results                                     |
+| `n`      | Deselect all results                                   |
+| `Enter`  | Replace only the hovered result, then advance          |
+| `R`      | Replace all currently selected results at once         |
+| `Ctrl-s` | Toggle scope (buffer ↔ workspace) and return to Search |
+
+> 💡 Replacements are applied as normal transactions and can be undone with `u`.
+
+> 💡 When `regex` is active, capture groups can be referenced in the replacement
+> field using `$1`, `$2`, etc.
 
 ## Picker
 

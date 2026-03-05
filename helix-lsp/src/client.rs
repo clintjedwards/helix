@@ -416,6 +416,14 @@ impl Client {
         self.config.as_ref()
     }
 
+    pub fn root_path(&self) -> &std::path::Path {
+        &self.root_path
+    }
+
+    pub fn server_pid(&self) -> Option<u32> {
+        self._process.id()
+    }
+
     pub async fn workspace_folders(
         &self,
     ) -> parking_lot::MutexGuard<'_, Vec<lsp::WorkspaceFolder>> {

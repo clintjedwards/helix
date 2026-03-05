@@ -1,6 +1,7 @@
 mod completion;
 mod document;
 pub(crate) mod editor;
+pub mod explorer;
 mod info;
 pub mod lsp;
 mod markdown;
@@ -9,6 +10,8 @@ pub mod overlay;
 pub mod picker;
 pub mod popup;
 pub mod prompt;
+pub mod search_replace;
+pub mod tree;
 mod select;
 mod spinner;
 mod statusline;
@@ -28,6 +31,9 @@ pub use picker::{Column as PickerColumn, FileLocation, Picker};
 pub use popup::Popup;
 pub use prompt::{Prompt, PromptEvent};
 pub use select::Select;
+pub use explorer::Explorer;
+pub use search_replace::{SearchReplace, SearchScope};
+pub use tree::{TreeOp, TreeView, TreeViewItem};
 pub use spinner::{ProgressSpinners, Spinner};
 pub use text::Text;
 

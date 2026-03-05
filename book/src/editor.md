@@ -22,6 +22,7 @@
 - [`[editor.smart-tab]` Section](#editorsmart-tab-section)
 - [`[editor.inline-diagnostics]` Section](#editorinline-diagnostics-section)
 - [`[editor.word-completion]` Section](#editorword-completion-section)
+- [`[editor.auto-reload]` Section](#editorauto-reload-section)
 
 ### `[editor]` Section
 
@@ -525,4 +526,25 @@ Example:
 enable = true
 # Set the trigger length lower so that words are completed more often
 trigger-length = 4
+```
+
+### `[editor.auto-reload]` Section
+
+> ⚠️ Auto-reload is only supported on Linux.
+
+Automatically reloads open buffers when their underlying files change on disk.
+When a buffer has unsaved changes, Helix can optionally prompt before reloading
+rather than silently discarding the in-memory edits.
+
+| Key                  | Description                                                                          | Default |
+| ---                  | ---                                                                                  | ---     |
+| `enable`             | Watch open files for external changes and reload them automatically                  | `false` |
+| `prompt-if-modified` | Show a confirmation prompt before reloading a buffer that has unsaved changes        | `true`  |
+
+Example:
+
+```toml
+[editor.auto-reload]
+enable = true
+prompt-if-modified = true  # ask before discarding unsaved changes on reload
 ```

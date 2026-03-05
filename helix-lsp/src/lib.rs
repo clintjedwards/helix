@@ -76,6 +76,29 @@ pub enum OffsetEncoding {
     Utf16,
 }
 
+/// The current status of a configured language server.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum LspServerStatus {
+    /// Server is in the registry but has not yet finished initialization.
+    Initializing,
+    /// Server is running and fully initialized.
+    Running,
+    /// Server was manually stopped via `:lsp-stop` (tombstone present in registry).
+    Stopped,
+    /// Server is not in the registry — either never started, or exited/crashed.
+    NotStarted,
+}
+
+/// A snapshot of status info for a configured language server.
+#[derive(Debug, Clone)]
+pub struct LspServerInfo {
+    pub name: String,
+    pub status: LspServerStatus,
+    pub root_path: Option<PathBuf>,
+    pub pid: Option<u32>,
+    pub offset_encoding: Option<OffsetEncoding>,
+}
+
 pub mod util {
     use super::*;
     use helix_core::line_ending::{line_end_byte_index, line_end_char_index};
@@ -747,6 +770,57 @@ impl Registry {
 
     pub fn iter_clients(&self) -> impl Iterator<Item = &Arc<Client>> {
         self.inner.values()
+    }
+
+    /// Returns status info for each language server configured in `language_config`.
+    ///
+    /// The order matches the order of `language_config.language_servers`.
+    pub fn get_server_infos_for_language(
+        &self,
+        language_config: &LanguageConfiguration,
+    ) -> Vec<LspServerInfo> {
+        language_config
+            .language_servers
+            .iter()
+            .map(|ls| {
+                let name = &ls.name;
+                match self.inner_by_name.get(name) {
+                    None => LspServerInfo {
+                        name: name.clone(),
+                        status: LspServerStatus::NotStarted,
+                        root_path: None,
+                        pid: None,
+                        offset_encoding: None,
+                    },
+                    Some(clients) if clients.is_empty() => LspServerInfo {
+                        name: name.clone(),
+                        status: LspServerStatus::Stopped,
+                        root_path: None,
+                        pid: None,
+                        offset_encoding: None,
+                    },
+                    Some(clients) => {
+                        let client = &clients[0];
+                        let initialized = client.is_initialized();
+                        LspServerInfo {
+                            name: name.clone(),
+                            status: if initialized {
+                                LspServerStatus::Running
+                            } else {
+                                LspServerStatus::Initializing
+                            },
+                            root_path: Some(client.root_path().to_owned()),
+                            pid: client.server_pid(),
+                            offset_encoding: if initialized {
+                                Some(client.offset_encoding())
+                            } else {
+                                None
+                            },
+                        }
+                    }
+                }
+            })
+            .collect()
     }
 }
 

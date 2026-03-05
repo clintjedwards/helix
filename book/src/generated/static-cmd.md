@@ -100,9 +100,11 @@
 | `file_picker` | Open file picker | normal: `` <space>f ``, select: `` <space>f `` |
 | `file_picker_in_current_buffer_directory` | Open file picker at current buffer's directory |  |
 | `file_picker_in_current_directory` | Open file picker at current working directory | normal: `` <space>F ``, select: `` <space>F `` |
-| `file_explorer` | Open file explorer in workspace root | normal: `` <space>e ``, select: `` <space>e `` |
-| `file_explorer_in_current_buffer_directory` | Open file explorer at current buffer's directory | normal: `` <space>E ``, select: `` <space>E `` |
+| `file_explorer` | Open file explorer in workspace root |  |
+| `file_explorer_in_current_buffer_directory` | Open file explorer at current buffer's directory |  |
 | `file_explorer_in_current_directory` | Open file explorer at current working directory |  |
+| `open_or_focus_explorer` | Open or focus the docked file explorer sidebar | normal: `` <space>E ``, select: `` <space>E `` |
+| `reveal_current_file` | Reveal the current file in the docked file explorer sidebar | normal: `` <space>e ``, select: `` <space>e `` |
 | `code_action` | Perform code action | normal: `` <space>a ``, select: `` <space>a `` |
 | `buffer_picker` | Open buffer picker | normal: `` <space>b ``, select: `` <space>b `` |
 | `jumplist_picker` | Open jumplist picker | normal: `` <space>j ``, select: `` <space>j `` |
@@ -116,6 +118,8 @@
 | `lsp_or_syntax_workspace_symbol_picker` | Open workspace symbol picker from LSP or syntax information | normal: `` <space>S ``, select: `` <space>S `` |
 | `diagnostics_picker` | Open diagnostic picker | normal: `` <space>d ``, select: `` <space>d `` |
 | `workspace_diagnostics_picker` | Open workspace diagnostic picker | normal: `` <space>D ``, select: `` <space>D `` |
+| `lsp_info` | Show status of language servers for current document |  |
+| `search_replace` | Open interactive search and replace panel | normal: `` <space><A-/> ``, select: `` <space><A-/> `` |
 | `last_picker` | Open last picker | normal: `` <space>' ``, select: `` <space>' `` |
 | `insert_at_line_start` | Insert at start of line | normal: `` I ``, select: `` I `` |
 | `insert_at_line_end` | Insert at end of line | normal: `` A ``, select: `` A `` |

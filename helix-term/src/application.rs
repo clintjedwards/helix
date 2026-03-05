@@ -79,6 +79,14 @@ pub struct Application {
     lsp_progress: LspProgressMap,
 
     theme_mode: Option<theme::Mode>,
+
+    // File change events channel (used for auto-reload on Linux).
+    // On non-Linux the sender is dropped immediately so this never fires.
+    file_events: tokio::sync::mpsc::UnboundedReceiver<std::path::PathBuf>,
+    #[cfg(target_os = "linux")]
+    file_watcher: Option<notify::RecommendedWatcher>,
+    #[cfg(target_os = "linux")]
+    watched_paths: std::collections::HashSet<std::path::PathBuf>,
 }
 
 #[cfg(feature = "integration")]
@@ -256,6 +264,23 @@ impl Application {
         ])
         .context("build signal handler")?;
 
+        let (file_tx, file_rx) = tokio::sync::mpsc::unbounded_channel::<std::path::PathBuf>();
+        #[cfg(target_os = "linux")]
+        let file_watcher = {
+            let tx = file_tx.clone();
+            notify::recommended_watcher(move |res: notify::Result<notify::Event>| {
+                if let Ok(event) = res {
+                    for path in event.paths {
+                        let _ = tx.send(path);
+                    }
+                }
+            })
+            .ok()
+        };
+        // On non-Linux, drop the sender so the receiver never gets events.
+        #[cfg(not(target_os = "linux"))]
+        drop(file_tx);
+
         let app = Self {
             compositor,
             terminal,
@@ -265,6 +290,11 @@ impl Application {
             jobs,
             lsp_progress: LspProgressMap::new(),
             theme_mode,
+            file_events: file_rx,
+            #[cfg(target_os = "linux")]
+            file_watcher,
+            #[cfg(target_os = "linux")]
+            watched_paths: std::collections::HashSet::new(),
         };
 
         Ok(app)
@@ -367,7 +397,17 @@ impl Application {
                         }
                     }
                 }
+                Some(path) = self.file_events.recv() => {
+                    #[cfg(target_os = "linux")]
+                    if self.editor.config().auto_reload.enable {
+                        self.handle_file_changed(path);
+                        self.render().await;
+                    }
+                }
             }
+
+            #[cfg(target_os = "linux")]
+            self.sync_watched_paths();
 
             // for integration tests only, reset the idle timer after every
             // event to signal when test events are done processing
@@ -1338,6 +1378,145 @@ impl Application {
         }
 
         errs
+    }
+
+    /// Sync the set of watched paths to match currently open documents.
+    /// Called after each event loop iteration to keep the watcher up to date.
+    #[cfg(target_os = "linux")]
+    fn sync_watched_paths(&mut self) {
+        use notify::Watcher;
+        let Some(watcher) = self.file_watcher.as_mut() else {
+            return;
+        };
+
+        let current_paths: std::collections::HashSet<std::path::PathBuf> = self
+            .editor
+            .documents()
+            .filter_map(|doc| doc.path().map(|p| p.to_path_buf()))
+            .collect();
+
+        for path in current_paths.difference(&self.watched_paths) {
+            let _ = watcher.watch(path, notify::RecursiveMode::NonRecursive);
+        }
+        for path in self.watched_paths.difference(&current_paths) {
+            let _ = watcher.unwatch(path);
+        }
+        self.watched_paths = current_paths;
+    }
+
+    /// Handle a file-changed event from the watcher.
+    #[cfg(target_os = "linux")]
+    fn handle_file_changed(&mut self, path: std::path::PathBuf) {
+        let prompt_if_modified = self.editor.config().auto_reload.prompt_if_modified;
+
+        // Collect doc IDs for documents matching this path
+        let doc_ids: Vec<_> = self
+            .editor
+            .documents()
+            .filter(|doc| doc.path().map(|p| p.as_path()) == Some(path.as_path()))
+            .map(|doc| doc.id())
+            .collect();
+
+        for doc_id in doc_ids {
+            let doc = doc!(self.editor, &doc_id);
+            // Check if mtime is newer than when we last saved/loaded
+            let path_mtime = path.metadata().ok().and_then(|m| m.modified().ok());
+            let Some(mtime) = path_mtime else {
+                continue;
+            };
+            if mtime <= doc.last_saved_time() {
+                continue; // Our own write, skip
+            }
+
+            if doc.is_modified() && prompt_if_modified {
+                self.prompt_reload(doc_id, path.clone());
+            } else {
+                self.reload_document(doc_id);
+            }
+        }
+    }
+
+    /// Silently reload the given document.
+    #[cfg(target_os = "linux")]
+    fn reload_document(&mut self, doc_id: helix_view::DocumentId) {
+        let scrolloff = self.editor.config().scrolloff;
+        // Find a view that has this document
+        let view_id = self
+            .editor
+            .tree
+            .views()
+            .find(|(view, _)| view.doc == doc_id)
+            .map(|(view, _)| view.id);
+        let Some(view_id) = view_id else {
+            return;
+        };
+
+        let view = view_mut!(self.editor, view_id);
+        let doc = doc_mut!(self.editor, &doc_id);
+        if let Err(err) = doc
+            .reload(view, &self.editor.diff_providers)
+            .map(|_| view.ensure_cursor_in_view(doc, scrolloff))
+        {
+            self.editor.set_error(format!("Auto-reload failed: {err}"));
+            return;
+        }
+
+        if let Some(path) = doc!(self.editor, &doc_id).path().cloned() {
+            self.editor
+                .language_servers
+                .file_event_handler
+                .file_changed(path);
+        }
+    }
+
+    /// Show a confirmation prompt before reloading a modified document.
+    #[cfg(target_os = "linux")]
+    fn prompt_reload(&mut self, doc_id: helix_view::DocumentId, path: std::path::PathBuf) {
+        use crate::ui::{prompt::PromptEvent, Prompt};
+
+        let filename = path
+            .file_name()
+            .unwrap_or(path.as_os_str())
+            .to_string_lossy()
+            .into_owned();
+        let prompt = Prompt::new(
+            format!("File '{}' changed on disk. Reload? (y/n) ", filename).into(),
+            None,
+            ui::completers::none,
+            move |cx, input, event| {
+                if event != PromptEvent::Validate {
+                    return;
+                }
+                if input == "y" || input == "Y" {
+                    let scrolloff = cx.editor.config().scrolloff;
+                    let view_id = cx
+                        .editor
+                        .tree
+                        .views()
+                        .find(|(view, _)| view.doc == doc_id)
+                        .map(|(view, _)| view.id);
+                    if let Some(view_id) = view_id {
+                        let view = view_mut!(cx.editor, view_id);
+                        let doc = doc_mut!(cx.editor, &doc_id);
+                        if let Err(err) = doc
+                            .reload(view, &cx.editor.diff_providers)
+                            .map(|_| view.ensure_cursor_in_view(doc, scrolloff))
+                        {
+                            cx.editor
+                                .set_error(format!("Auto-reload failed: {err}"));
+                        } else if let Some(path) =
+                            doc!(cx.editor, &doc_id).path().cloned()
+                        {
+                            cx.editor
+                                .language_servers
+                                .file_event_handler
+                                .file_changed(path);
+                        }
+                    }
+                }
+            },
+        );
+        self.compositor.push(Box::new(prompt));
     }
 }
 

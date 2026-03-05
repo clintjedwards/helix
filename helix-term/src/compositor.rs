@@ -35,6 +35,70 @@ impl Context<'_> {
         tokio::task::block_in_place(|| helix_lsp::block_on(self.editor.flush_writes()))?;
         Ok(())
     }
+
+    #[cfg(test)]
+    pub fn dummy<'a>(jobs: &'a mut Jobs, editor: &'a mut helix_view::Editor) -> Context<'a> {
+        Context {
+            jobs,
+            scroll: None,
+            editor,
+        }
+    }
+
+    #[cfg(test)]
+    pub fn dummy_jobs() -> Jobs {
+        Jobs::new()
+    }
+
+    #[cfg(test)]
+    pub fn dummy_editor() -> helix_view::Editor {
+        use crate::config::Config;
+        use arc_swap::ArcSwap;
+        use helix_core::syntax::{self, config::Configuration};
+        use helix_view::{handlers::Handlers, theme};
+        use std::sync::Arc;
+        use tokio::sync::mpsc;
+
+        static EVENTS_REGISTERED: std::sync::OnceLock<()> = std::sync::OnceLock::new();
+        EVENTS_REGISTERED.get_or_init(|| {
+            crate::events::register();
+        });
+
+        let (completion_tx, _completion_rx) = mpsc::channel(1);
+        let (sig_tx, _sig_rx) = mpsc::channel(1);
+        let (auto_save_tx, _auto_save_rx) = mpsc::channel(1);
+        let (doc_colors_tx, _doc_colors_rx) = mpsc::channel(1);
+        let (pull_diag_tx, _pull_diag_rx) = mpsc::channel(1);
+        let (pull_all_diag_tx, _pull_all_diag_rx) = mpsc::channel(1);
+
+        let handlers = Handlers {
+            completions: helix_view::handlers::completion::CompletionHandler::new(completion_tx),
+            signature_hints: sig_tx,
+            auto_save: auto_save_tx,
+            document_colors: doc_colors_tx,
+            word_index: helix_view::handlers::word_index::Handler::spawn(),
+            pull_diagnostics: pull_diag_tx,
+            pull_all_documents_diagnostics: pull_all_diag_tx,
+        };
+
+        let config = Arc::new(ArcSwap::from_pointee(Config::default()));
+        helix_view::Editor::new(
+            Rect::new(0, 0, 60, 120),
+            Arc::new(theme::Loader::new(&[])),
+            Arc::new(ArcSwap::from_pointee(
+                syntax::Loader::new(Configuration {
+                    language: vec![],
+                    language_server: std::collections::HashMap::new(),
+                })
+                .unwrap(),
+            )),
+            Arc::new(arc_swap::access::Map::new(
+                Arc::clone(&config),
+                |config: &Config| &config.editor,
+            )),
+            handlers,
+        )
+    }
 }
 
 pub trait Component: Any + AnyComponent {
@@ -72,6 +136,19 @@ pub trait Component: Any + AnyComponent {
 
     fn id(&self) -> Option<&'static str> {
         None
+    }
+
+    #[cfg(test)]
+    fn handle_events(&mut self, events: &str) -> anyhow::Result<()> {
+        use helix_view::input::parse_macro;
+
+        let mut editor = Context::dummy_editor();
+        let mut jobs = Context::dummy_jobs();
+        let mut cx = Context::dummy(&mut jobs, &mut editor);
+        for event in parse_macro(events)? {
+            self.handle_event(&Event::Key(event), &mut cx);
+        }
+        Ok(())
     }
 }
 

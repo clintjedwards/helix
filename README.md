@@ -43,6 +43,84 @@ a custom renderer (similar to Emacs) using wgpu.
 Note: Only certain languages have indentation definitions at the moment. Check
 `runtime/queries/<lang>/` for `indents.scm`.
 
+# Fork additions
+
+This is clint's personal fork with the following features added on top of upstream:
+
+## LSP status picker
+
+Run `:lsp-info` to open a picker showing all language servers for the current file — their status (initializing, running, stopped), root path, and PID. Pressing Enter on a server restarts it.
+
+## Docked file explorer
+
+A sidebar file explorer with vim-style navigation. Press `<space>e` to reveal the current file in the explorer, or `<space>E` to open/focus it at the workspace root.
+
+Inside the explorer:
+- `j`/`k` — move up/down
+- `<ret>` — open file
+- `r` — rename
+- `a` — new file or folder
+- `d` — delete
+- `]` — change root to current folder
+- `[` — go to previous root
+- `?` — toggle help
+
+Configure in `~/.config/helix/config.toml`:
+
+```toml
+[editor.explorer]
+position = "left"   # or "right"
+column-width = 36
+```
+
+## Interactive search & replace
+
+A VSCode-style search and replace panel with a live diff preview. Press `<space>Alt-/` to open it.
+
+```
+┌─ Search & Replace — buffer ──────────────────────────────────────────────────┐
+│  match-case (alt-c)   regex (alt-r)  [whole-word](alt-w)   scope: buffer (ctrl-s) │
+│ ▶ Search:  foo                                                               │
+│   Replace: bar                                                               │
+├──────────────────────────────────────────────────────────────────────────────┤
+│ ● src/main.rs:42   │ ──────────── Preview ─────────────────────────────     │
+│ ● src/lib.rs:17    │ src/main.rs:42                                          │
+│ ○ tests/test.rs:5  │                                                         │
+│                    │ - let foo = "hello world"                               │
+│                    │ + let bar = "hello world"                               │
+├──────────────────────────────────────────────────────────────────────────────┤
+│          <enter>:replace this  R:replace all selected  [a]ll  [n]one         │
+└──────────────────────────────────────────────────────────────────────────────┘
+```
+
+**Options** (toggle from any field):
+- `alt-c` — **match-case**: case-sensitive matching
+- `alt-r` — **regex**: treat search as a regular expression (supports `$1`/`$2` capture group references in the replacement)
+- `alt-w` — **whole-word**: only match complete words, not substrings
+
+**Scope**: `ctrl-s` toggles between the current buffer and the entire workspace.
+
+**Results list** (focus with `Tab`):
+- `j`/`k` — move up/down
+- `space` — toggle a result on/off
+- `a`/`n` — select all / deselect all
+- `enter` — replace only the hovered match
+- `R` — replace all selected matches at once
+
+Replacements are applied as normal transactions and can be undone with `u`.
+
+## Auto file reload (Linux only)
+
+Automatically reloads open buffers when their files change on disk. Disabled by default. When a buffer has unsaved changes, a prompt is shown before reloading.
+
+Enable in `~/.config/helix/config.toml`:
+
+```toml
+[editor.auto-reload]
+enable = true
+prompt-if-modified = true  # ask before reloading buffers with unsaved changes
+```
+
 # Installation
 
 [Installation documentation](https://docs.helix-editor.com/install.html).

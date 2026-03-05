@@ -406,6 +406,8 @@ impl MappableCommand {
         file_explorer, "Open file explorer in workspace root",
         file_explorer_in_current_buffer_directory, "Open file explorer at current buffer's directory",
         file_explorer_in_current_directory, "Open file explorer at current working directory",
+        open_or_focus_explorer, "Open or focus the docked file explorer sidebar",
+        reveal_current_file, "Reveal the current file in the docked file explorer sidebar",
         code_action, "Perform code action",
         buffer_picker, "Open buffer picker",
         jumplist_picker, "Open jumplist picker",
@@ -419,6 +421,8 @@ impl MappableCommand {
         lsp_or_syntax_workspace_symbol_picker, "Open workspace symbol picker from LSP or syntax information",
         diagnostics_picker, "Open diagnostic picker",
         workspace_diagnostics_picker, "Open workspace diagnostic picker",
+        lsp_info, "Show status of language servers for current document",
+        search_replace, "Open interactive search and replace panel",
         last_picker, "Open last picker",
         insert_at_line_start, "Insert at start of line",
         insert_at_line_end, "Insert at end of line",
@@ -2451,6 +2455,11 @@ fn make_search_word_bounded(cx: &mut Context) {
     }
 }
 
+fn search_replace(cx: &mut Context) {
+    let component = ui::SearchReplace::new(ui::SearchScope::Buffer);
+    cx.push_layer(Box::new(ui::overlay::overlaid(component)));
+}
+
 fn global_search(cx: &mut Context) {
     #[derive(Debug)]
     struct FileResult {
@@ -3154,6 +3163,54 @@ fn file_explorer_in_current_directory(cx: &mut Context) {
     if let Ok(picker) = ui::file_explorer(cwd, cx.editor) {
         cx.push_layer(Box::new(overlaid(picker)));
     }
+}
+
+fn open_or_focus_explorer(cx: &mut Context) {
+    let root = find_workspace().0;
+    let column_width = cx.editor.config().explorer.column_width as u16;
+    cx.callback.push(Box::new(
+        move |compositor: &mut crate::compositor::Compositor, _cx| {
+            let editor_view = compositor
+                .find::<ui::EditorView>()
+                .expect("open_or_focus_explorer: EditorView not found");
+            match editor_view.explorer.as_mut() {
+                Some(explorer) => explorer.focus(),
+                None => {
+                    if let Ok(explorer) = ui::Explorer::from_path(root, column_width) {
+                        editor_view.explorer = Some(explorer);
+                    }
+                }
+            }
+        },
+    ));
+}
+
+fn reveal_current_file(cx: &mut Context) {
+    let path = doc!(cx.editor).path().map(|p| p.to_path_buf());
+    let root = find_workspace().0;
+    let column_width = cx.editor.config().explorer.column_width as u16;
+    cx.callback.push(Box::new(
+        move |compositor: &mut crate::compositor::Compositor, _cx| {
+            let editor_view = compositor
+                .find::<ui::EditorView>()
+                .expect("reveal_current_file: EditorView not found");
+            let explorer = match editor_view.explorer.as_mut() {
+                Some(e) => e,
+                None => {
+                    if let Ok(explorer) = ui::Explorer::from_path(root, column_width) {
+                        editor_view.explorer = Some(explorer);
+                        editor_view.explorer.as_mut().unwrap()
+                    } else {
+                        return;
+                    }
+                }
+            };
+            if let Some(path) = path {
+                let _ = explorer.reveal_file(path);
+            }
+            explorer.focus();
+        },
+    ));
 }
 
 fn buffer_picker(cx: &mut Context) {

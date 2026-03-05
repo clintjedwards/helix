@@ -56,6 +56,7 @@
 | `:lsp-workspace-command` | Open workspace command picker |
 | `:lsp-restart` | Restarts the given language servers, or all language servers that are used by the current file if no arguments are supplied |
 | `:lsp-stop` | Stops the given language servers, or all language servers that are used by the current file if no arguments are supplied |
+| `:lsp-info` | Show status of language servers configured for the current document. Press Enter to restart the selected server. |
 | `:tree-sitter-scopes` | Display tree sitter scopes, primarily for theming and development. |
 | `:tree-sitter-highlight-name` | Display name of tree-sitter highlight scope under the cursor. |
 | `:tree-sitter-layers` | Display language names of tree-sitter injection layers under the cursor. |
