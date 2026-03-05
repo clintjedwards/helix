@@ -225,8 +225,9 @@ pub fn default() -> HashMap<Mode, KeyTrie> {
         "space" => { "Space"
             "f" => file_picker,
             "F" => file_picker_in_current_directory,
-            "e" => file_explorer,
+            "e" => reveal_current_file,
             "." => file_explorer_in_current_buffer_directory,
+            "E" => open_or_focus_explorer,
             "b" => buffer_picker,
             "j" => jumplist_picker,
             "s" => lsp_or_syntax_symbol_picker,
@@ -285,6 +286,7 @@ pub fn default() -> HashMap<Mode, KeyTrie> {
             "P" => paste_clipboard_before,
             "R" => replace_selections_with_clipboard,
             "/" => global_search,
+            "A-/" => search_replace,
             "k" => hover,
             "r" => rename_symbol,
             "h" => select_references_to_symbol_under_cursor,

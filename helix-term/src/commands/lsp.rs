@@ -6,7 +6,7 @@ use helix_lsp::{
         NumberOrString,
     },
     util::{diagnostic_to_lsp_diagnostic, lsp_range_to_range, range_to_lsp_range},
-    Client, LanguageServerId, OffsetEncoding,
+    Client, LanguageServerId, LspServerInfo, LspServerStatus, OffsetEncoding,
 };
 use tokio_stream::StreamExt;
 use tui::{text::Span, widgets::Row};
@@ -1455,4 +1455,118 @@ fn compute_inlay_hints_for_view(
     );
 
     Some(callback)
+}
+
+pub fn lsp_info(cx: &mut Context) {
+    let doc = doc!(cx.editor);
+    let Some(language_config) = doc.language_config() else {
+        cx.editor
+            .set_error("No language configured for current document");
+        return;
+    };
+
+    let items = cx
+        .editor
+        .language_servers
+        .get_server_infos_for_language(language_config);
+
+    if items.is_empty() {
+        cx.editor
+            .set_error("No language servers configured for this document");
+        return;
+    }
+
+    let columns = [
+        ui::PickerColumn::new("name", |item: &LspServerInfo, _| {
+            item.name.as_str().into()
+        }),
+        ui::PickerColumn::new("status", |item: &LspServerInfo, _| {
+            match item.status {
+                LspServerStatus::Initializing => "initializing",
+                LspServerStatus::Running => "running",
+                LspServerStatus::Stopped => "stopped",
+                LspServerStatus::NotStarted => "not started",
+            }
+            .into()
+        }),
+        ui::PickerColumn::new("root", |item: &LspServerInfo, _| {
+            item.root_path
+                .as_deref()
+                .map(|p| {
+                    path::get_truncated_path(p)
+                        .to_string_lossy()
+                        .into_owned()
+                        .into()
+                })
+                .unwrap_or_default()
+        }),
+        ui::PickerColumn::new("pid", |item: &LspServerInfo, _| {
+            item.pid
+                .map(|p| p.to_string())
+                .unwrap_or_default()
+                .into()
+        }),
+        ui::PickerColumn::new("encoding", |item: &LspServerInfo, _| {
+            match item.offset_encoding {
+                Some(OffsetEncoding::Utf8) => "UTF-8",
+                Some(OffsetEncoding::Utf16) => "UTF-16",
+                Some(OffsetEncoding::Utf32) => "UTF-32",
+                None => "",
+            }
+            .into()
+        }),
+    ];
+
+    let picker = Picker::new(columns, 0, items, (), move |cx, item, _action| {
+        // On selection, restart the chosen language server
+        let language = doc!(cx.editor).language.clone();
+        let doc_path = doc!(cx.editor).path().cloned();
+        let workspace_lsp_roots = cx.editor.config.load().workspace_lsp_roots.clone();
+        let snippets = cx.editor.config.load().lsp.snippets;
+
+        let Some(language_config) = language else {
+            return;
+        };
+
+        match cx.editor.language_servers.restart_server(
+            &item.name,
+            &language_config,
+            doc_path.as_ref(),
+            &workspace_lsp_roots,
+            snippets,
+        ) {
+            Some(Err(err)) => {
+                cx.editor.set_error(err.to_string());
+                return;
+            }
+            None => {
+                cx.editor.set_status(format!(
+                    "'{}' not started (no suitable workspace root found)",
+                    item.name
+                ));
+                return;
+            }
+            Some(Ok(_)) => cx
+                .editor
+                .set_status(format!("Restarting '{}'", item.name)),
+        }
+
+        let name = item.name.clone();
+        let doc_ids: Vec<_> = cx
+            .editor
+            .documents()
+            .filter(|doc| {
+                doc.language_config().map_or(false, |cfg| {
+                    cfg.language_servers.iter().any(|ls| ls.name == name)
+                })
+            })
+            .map(|doc| doc.id())
+            .collect();
+
+        for id in doc_ids {
+            cx.editor.refresh_language_servers(id);
+        }
+    });
+
+    cx.push_layer(Box::new(overlaid(picker)));
 }

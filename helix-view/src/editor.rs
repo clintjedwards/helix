@@ -266,6 +266,57 @@ impl Default for FileExplorerConfig {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum ExplorerPosition {
+    Left,
+    Right,
+}
+
+impl Default for ExplorerPosition {
+    fn default() -> Self {
+        Self::Left
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case", default, deny_unknown_fields)]
+pub struct ExplorerConfig {
+    /// Which side of the editor the explorer is docked to. Defaults to "left".
+    pub position: ExplorerPosition,
+    /// Width of the explorer panel in columns. Defaults to 36.
+    pub column_width: usize,
+}
+
+impl Default for ExplorerConfig {
+    fn default() -> Self {
+        Self {
+            position: ExplorerPosition::Left,
+            column_width: 36,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case", default, deny_unknown_fields)]
+pub struct AutoReloadConfig {
+    /// Automatically reload documents when files change on disk.
+    /// Linux only. Defaults to false.
+    pub enable: bool,
+    /// Show a prompt before reloading a document with unsaved changes.
+    /// Defaults to true.
+    pub prompt_if_modified: bool,
+}
+
+impl Default for AutoReloadConfig {
+    fn default() -> Self {
+        Self {
+            enable: false,
+            prompt_if_modified: true,
+        }
+    }
+}
+
 fn serialize_alphabet<S>(alphabet: &[char], serializer: S) -> Result<S::Ok, S::Error>
 where
     S: Serializer,
@@ -366,6 +417,8 @@ pub struct Config {
     pub auto_info: bool,
     pub file_picker: FilePickerConfig,
     pub file_explorer: FileExplorerConfig,
+    /// Configuration of the docked tree-based file explorer sidebar.
+    pub explorer: ExplorerConfig,
     /// Configuration of the statusline elements
     pub statusline: StatusLineConfig,
     /// Shape for cursor in each mode
@@ -434,6 +487,8 @@ pub struct Config {
     pub buffer_picker: BufferPickerConfig,
     /// Whether to implicitly trust every workspace or not
     pub insecure: bool,
+    /// Automatic file reloading when files change on disk. Linux only.
+    pub auto_reload: AutoReloadConfig,
 }
 
 #[derive(Debug, Default, PartialEq, Eq, PartialOrd, Ord, Deserialize, Serialize, Clone, Copy)]
@@ -1120,6 +1175,7 @@ impl Default for Config {
             auto_info: true,
             file_picker: FilePickerConfig::default(),
             file_explorer: FileExplorerConfig::default(),
+            explorer: ExplorerConfig::default(),
             statusline: StatusLineConfig::default(),
             cursor_shape: CursorShapeConfig::default(),
             true_color: false,
@@ -1157,6 +1213,7 @@ impl Default for Config {
             kitty_keyboard_protocol: Default::default(),
             buffer_picker: BufferPickerConfig::default(),
             insecure: false,
+            auto_reload: AutoReloadConfig::default(),
         }
     }
 }
