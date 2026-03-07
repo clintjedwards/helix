@@ -308,6 +308,8 @@ impl MappableCommand {
         move_char_right, "Move right",
         move_line_up, "Move up",
         move_line_down, "Move down",
+        drag_line_up, "Move selected lines up",
+        drag_line_down, "Move selected lines down",
         move_visual_line_up, "Move up",
         move_visual_line_down, "Move down",
         extend_char_left, "Extend left",
@@ -767,6 +769,102 @@ fn move_line_up(cx: &mut Context) {
 
 fn move_line_down(cx: &mut Context) {
     move_impl(cx, move_vertically, Direction::Forward, Movement::Move)
+}
+
+fn drag_line_up(cx: &mut Context) {
+    drag_line_impl(cx, Direction::Backward);
+}
+
+fn drag_line_down(cx: &mut Context) {
+    drag_line_impl(cx, Direction::Forward);
+}
+
+fn drag_line_impl(cx: &mut Context, dir: Direction) {
+    let (view, doc) = current!(cx.editor);
+    let text = doc.text();
+    let slice = text.slice(..);
+    let selection = doc.selection(view.id).clone();
+    let primary = selection.primary_index();
+
+    let mut changes: Vec<(usize, usize, Tendril)> = Vec::new();
+    let mut new_ranges: Vec<Range> = Vec::new();
+    let mut last_swap_end = 0usize;
+
+    for range in selection.ranges() {
+        let (start_line, end_line) = range.line_range(slice);
+
+        let (a_start, a_end, b_start, b_end) = match dir {
+            Direction::Forward => {
+                let next_line = end_line + 1;
+                if next_line >= text.len_lines() {
+                    new_ranges.push(*range);
+                    continue;
+                }
+                let a_start = text.line_to_char(start_line);
+                let a_end = text.line_to_char(end_line + 1);
+                let b_end = text.line_to_char((next_line + 1).min(text.len_lines()));
+                (a_start, a_end, a_end, b_end)
+            }
+            Direction::Backward => {
+                if start_line == 0 {
+                    new_ranges.push(*range);
+                    continue;
+                }
+                let a_start = text.line_to_char(start_line - 1);
+                let a_end = text.line_to_char(start_line);
+                let b_end = text.line_to_char((end_line + 1).min(text.len_lines()));
+                (a_start, a_end, a_end, b_end)
+            }
+        };
+
+        if b_start == b_end || a_start < last_swap_end {
+            new_ranges.push(*range);
+            continue;
+        }
+
+        let a_text: Tendril = slice.slice(a_start..a_end).chars().collect();
+        let b_text: Tendril = slice.slice(b_start..b_end).chars().collect();
+
+        // Swap: put b before a. When b has no trailing newline (last line of file),
+        // move the newline from the end of a to between them.
+        let new_text = if b_text.ends_with('\n') {
+            let mut t = b_text.clone();
+            t.push_str(&a_text);
+            t
+        } else {
+            let mut t = b_text.clone();
+            t.push('\n');
+            t.push_str(a_text.trim_end_matches('\n'));
+            t
+        };
+
+        let (new_anchor, new_head) = match dir {
+            Direction::Forward => {
+                let b_len = b_end - b_start;
+                (range.anchor + b_len, range.head + b_len)
+            }
+            Direction::Backward => {
+                let a_len = a_end - a_start;
+                (range.anchor - a_len, range.head - a_len)
+            }
+        };
+
+        last_swap_end = b_end;
+        changes.push((a_start, b_end, new_text));
+        new_ranges.push(Range::new(new_anchor, new_head));
+    }
+
+    if changes.is_empty() {
+        return;
+    }
+
+    let transaction = Transaction::change(
+        doc.text(),
+        changes.into_iter().map(|(from, to, t)| (from, to, Some(t))),
+    );
+
+    doc.apply(&transaction, view.id);
+    doc.set_selection(view.id, Selection::new(new_ranges.into(), primary));
 }
 
 fn move_visual_line_up(cx: &mut Context) {
