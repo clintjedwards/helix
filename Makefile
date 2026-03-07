@@ -17,8 +17,7 @@ install: build
 	install -m755 target/release/hx $(BIN_DIR)/hx
 	@mkdir -p $(CONFIG_DIR)
 	@if [ -L $(RUNTIME_LINK) ]; then \
-		echo "Updating runtime symlink -> $(CURDIR)/runtime"; \
-		ln -sf $(CURDIR)/runtime $(RUNTIME_LINK); \
+		echo "Runtime symlink already exists, skipping."; \
 	elif [ -e $(RUNTIME_LINK) ]; then \
 		echo "Warning: $(RUNTIME_LINK) already exists and is not a symlink."; \
 		echo "         Remove it manually if you want to use this repo's runtime."; \

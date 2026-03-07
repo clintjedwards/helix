@@ -200,6 +200,63 @@ fn status(repo: &Repository, f: impl Fn(Result<FileChange>) -> bool) -> Result<(
     Ok(())
 }
 
+fn normalize_to_https(url: &str) -> String {
+    let url = url.trim_end_matches(".git");
+    if let Some(rest) = url.strip_prefix("git@") {
+        if let Some(colon_pos) = rest.find(':') {
+            return format!("https://{}/{}", &rest[..colon_pos], &rest[colon_pos + 1..]);
+        }
+    }
+    if url.starts_with("http://") {
+        return url.replacen("http://", "https://", 1);
+    }
+    url.to_string()
+}
+
+pub fn get_permalink_url(
+    file: &Path,
+    start_line: usize,
+    end_line: Option<usize>,
+) -> Result<String> {
+    debug_assert!(file.is_absolute());
+    let file = gix::path::realpath(file).context("resolve symlinks")?;
+    let repo_dir = get_repo_dir(&file)?;
+    let repo = open_repo(repo_dir)?.to_thread_local();
+
+    let commit_hash = repo.head_commit()?.id.to_hex().to_string();
+
+    let work_dir = repo
+        .workdir()
+        .context("repo has no workdir")?
+        .to_path_buf();
+
+    let output = std::process::Command::new("git")
+        .args(["config", "--get", "remote.origin.url"])
+        .current_dir(&work_dir)
+        .output()
+        .context("failed to run git config")?;
+    if !output.status.success() {
+        bail!("No remote.origin.url found. Are you in a GitHub repo?");
+    }
+    let raw_url = String::from_utf8(output.stdout).context("remote URL is not valid UTF-8")?;
+    let base_url = normalize_to_https(raw_url.trim());
+
+    let rel_path = file
+        .strip_prefix(&work_dir)
+        .context("file is outside repo")?;
+    let rel_path_str = rel_path.to_string_lossy();
+
+    let anchor = match end_line {
+        Some(end) => format!("#L{}-L{}", start_line, end),
+        None => format!("#L{}", start_line),
+    };
+
+    Ok(format!(
+        "{}/blob/{}/{}{}",
+        base_url, commit_hash, rel_path_str, anchor
+    ))
+}
+
 /// Finds the object that contains the contents of a file at a specific commit.
 fn find_file_in_commit(repo: &Repository, commit: &Commit, file: &Path) -> Result<ObjectId> {
     let repo_dir = repo.workdir().context("repo has no worktree")?;

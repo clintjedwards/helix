@@ -45,7 +45,7 @@ Note: Only certain languages have indentation definitions at the moment. Check
 
 # Fork additions
 
-This is clint's personal fork with the following features added on top of upstream:
+This is my personal fork of helix adding to the base codebase the things I personally need and use.
 
 ## LSP status picker
 

@@ -20,6 +20,15 @@ mod status;
 
 pub use status::FileChange;
 
+#[cfg(feature = "git")]
+pub fn get_permalink_url(
+    file: &std::path::Path,
+    start_line: usize,
+    end_line: Option<usize>,
+) -> anyhow::Result<String> {
+    git::get_permalink_url(file, start_line, end_line)
+}
+
 /// Contains all active diff providers. Diff providers are compiled in via features. Currently
 /// only `git` is supported.
 #[derive(Clone)]

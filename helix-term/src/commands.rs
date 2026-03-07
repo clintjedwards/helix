@@ -417,6 +417,7 @@ impl MappableCommand {
         syntax_symbol_picker, "Open symbol picker from syntax information",
         lsp_or_syntax_symbol_picker, "Open symbol picker from LSP or syntax information",
         changed_file_picker, "Open changed file picker",
+        git_permalink, "Copy GitHub permalink for current selection to clipboard",
         select_references_to_symbol_under_cursor, "Select symbol references",
         workspace_symbol_picker, "Open workspace symbol picker",
         syntax_workspace_symbol_picker, "Open workspace symbol picker from syntax information",
@@ -3576,6 +3577,41 @@ fn changed_file_picker(cx: &mut Context) {
             }
         });
     cx.push_layer(Box::new(overlaid(picker)));
+}
+
+fn git_permalink(cx: &mut Context) {
+    let (view, doc) = current!(cx.editor);
+
+    let path = match doc.path() {
+        Some(p) => p.to_path_buf(),
+        None => {
+            cx.editor.set_error("Buffer has no file path");
+            return;
+        }
+    };
+
+    let text = doc.text();
+    let slice = text.slice(..);
+    let selection = doc.selection(view.id);
+    let primary = selection.primary();
+    let (start_line, end_line) = primary.line_range(slice);
+
+    let start = start_line + 1;
+    let end = if start_line == end_line {
+        None
+    } else {
+        Some(end_line + 1)
+    };
+
+    match helix_vcs::get_permalink_url(&path, start, end) {
+        Ok(url) => match cx.editor.registers.write('+', vec![url.clone()]) {
+            Ok(_) => cx
+                .editor
+                .set_status(format!("Permalink copied: {}", url)),
+            Err(err) => cx.editor.set_error(err.to_string()),
+        },
+        Err(err) => cx.editor.set_error(err.to_string()),
+    }
 }
 
 pub fn command_palette(cx: &mut Context) {
