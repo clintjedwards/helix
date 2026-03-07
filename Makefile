@@ -26,7 +26,7 @@ install: build
 		echo "Creating runtime symlink -> $(CURDIR)/runtime"; \
 		ln -sf $(CURDIR)/runtime $(RUNTIME_LINK); \
 	fi
-	$(BIN_DIR)/hx --grammar build
+	HELIX_RUNTIME=$(CURDIR)/runtime $(BIN_DIR)/hx --grammar build
 	@echo ""
 	@echo "Installed: $(BIN_DIR)/hx"
 	@echo "Runtime:   $(RUNTIME_LINK) -> $(CURDIR)/runtime"
@@ -36,7 +36,7 @@ install: build
 # Fetch any new/missing grammar sources and recompile (run when grammars change)
 fetch:
 	$(BIN_DIR)/hx --grammar fetch
-	$(BIN_DIR)/hx --grammar build
+	HELIX_RUNTIME=$(CURDIR)/runtime $(BIN_DIR)/hx --grammar build
 
 # Run the helix health check
 health:
