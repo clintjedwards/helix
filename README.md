@@ -109,6 +109,23 @@ A VSCode-style search and replace panel with a live diff preview. Press `<space>
 
 Replacements are applied as normal transactions and can be undone with `u`.
 
+## Line drag
+
+Move selected lines up or down without cutting and pasting. Works with multiple cursors/selections.
+
+| Key                           | Description              |
+| ----------------------------- | ------------------------ |
+| `Ctrl-k`, `Ctrl-Shift-Up`     | Move selected lines up   |
+| `Ctrl-j`, `Ctrl-Shift-Down`   | Move selected lines down |
+
+## GitHub permalink
+
+Press `Space+l` to generate a GitHub permalink for the current cursor position or selection and copy it to the system clipboard. The URL points to the exact commit, file, and line range.
+
+Single-line cursor produces `#L42`; a visual selection produces `#L42-L55`.
+
+The URL is displayed in the status bar after copying.
+
 ## Auto file reload (Linux only)
 
 Automatically reloads open buffers when their files change on disk. Disabled by default. When a buffer has unsaved changes, a prompt is shown before reloading.
