@@ -98,6 +98,8 @@ Normal mode is the default mode when you launch helix. You can return to it from
 | `Alt-c`     | Change selection (delete and enter insert mode, without yanking)     | `change_selection_noyank` |
 | `Ctrl-a`    | Increment object (number) under cursor                               | `increment`               |
 | `Ctrl-x`    | Decrement object (number) under cursor                               | `decrement`               |
+| `Ctrl-k`, `Ctrl-Shift-Up`   | Move selected lines up                                 | `drag_line_up`            |
+| `Ctrl-j`, `Ctrl-Shift-Down` | Move selected lines down                               | `drag_line_down`          |
 | `Q`         | Start/stop macro recording to the selected register (experimental)   | `record_macro`            |
 | `q`         | Play back a recorded macro from the selected register (experimental) | `replay_macro`            |
 
@@ -290,6 +292,8 @@ This layer is a kludge of mappings, mostly pickers.
 | -----   | -----------                                                             | -------                                    |
 | `f`     | Open file picker at LSP workspace root                                  | `file_picker`                              |
 | `F`     | Open file picker at current working directory                           | `file_picker_in_current_directory`         |
+| `e`     | Reveal current file in the file explorer                                | `reveal_current_file`                      |
+| `E`     | Open or focus the file explorer at workspace root                       | `open_or_focus_explorer`                   |
 | `b`     | Open buffer picker                                                      | `buffer_picker`                            |
 | `j`     | Open jumplist picker                                                    | `jumplist_picker`                          |
 | `g`     | Open changed file picker                                                | `changed_file_picker`                      |
@@ -314,6 +318,7 @@ This layer is a kludge of mappings, mostly pickers.
 | `R`     | Replace selections by clipboard contents                                | `replace_selections_with_clipboard`        |
 | `/`     | Global search in workspace folder                                       | `global_search`                            |
 | `Alt-/` | Open interactive search & replace panel                                 | `search_replace`                           |
+| `l`     | Copy GitHub permalink for current selection to clipboard                | `git_permalink`                            |
 | `?`     | Open command palette                                                    | `command_palette`                          |
 
 > 💡 Global search displays results in a fuzzy picker, use `Space + '` to bring it back up after opening a file.
