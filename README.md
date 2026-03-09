@@ -128,7 +128,7 @@ The URL is displayed in the status bar after copying.
 
 ## Auto file reload (Linux only)
 
-Automatically reloads open buffers when their files change on disk. Disabled by default. When a buffer has unsaved changes, a prompt is shown before reloading.
+Automatically reloads open buffers when their files change on disk. Reloads are instantaneous — uses inotify directory watching, so atomic saves (vim, emacs, most editors) are detected correctly. Disabled by default. When a buffer has unsaved changes, a prompt is shown before reloading.
 
 Enable in `~/.config/helix/config.toml`:
 

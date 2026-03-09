@@ -533,6 +533,10 @@ trigger-length = 4
 > ⚠️ Auto-reload is only supported on Linux.
 
 Automatically reloads open buffers when their underlying files change on disk.
+Uses inotify to watch the parent directory of each open file, so reloads are
+instantaneous and work correctly with editors that use atomic writes (write to
+a temp file, then rename into place — e.g. vim, emacs).
+
 When a buffer has unsaved changes, Helix can optionally prompt before reloading
 rather than silently discarding the in-memory edits.
 

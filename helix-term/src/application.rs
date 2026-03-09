@@ -86,7 +86,11 @@ pub struct Application {
     #[cfg(target_os = "linux")]
     file_watcher: Option<notify::RecommendedWatcher>,
     #[cfg(target_os = "linux")]
-    watched_paths: std::collections::HashSet<std::path::PathBuf>,
+    watched_dirs: std::collections::HashSet<std::path::PathBuf>,
+    // File events deferred while a helix write is in progress, to avoid
+    // false-positive reload prompts from our own saves completing.
+    #[cfg(target_os = "linux")]
+    deferred_file_events: Vec<std::path::PathBuf>,
 }
 
 #[cfg(feature = "integration")]
@@ -270,8 +274,14 @@ impl Application {
             let tx = file_tx.clone();
             notify::recommended_watcher(move |res: notify::Result<notify::Event>| {
                 if let Ok(event) = res {
-                    for path in event.paths {
-                        let _ = tx.send(path);
+                    use notify::EventKind;
+                    match &event.kind {
+                        EventKind::Modify(_) | EventKind::Create(_) => {
+                            for path in event.paths {
+                                let _ = tx.send(path);
+                            }
+                        }
+                        _ => {}
                     }
                 }
             })
@@ -294,7 +304,9 @@ impl Application {
             #[cfg(target_os = "linux")]
             file_watcher,
             #[cfg(target_os = "linux")]
-            watched_paths: std::collections::HashSet::new(),
+            watched_dirs: std::collections::HashSet::new(),
+            #[cfg(target_os = "linux")]
+            deferred_file_events: Vec::new(),
         };
 
         Ok(app)
@@ -400,8 +412,15 @@ impl Application {
                 Some(path) = self.file_events.recv() => {
                     #[cfg(target_os = "linux")]
                     if self.editor.config().auto_reload.enable {
-                        self.handle_file_changed(path);
-                        self.render().await;
+                        // Defer while helix has a write in flight, to avoid a
+                        // race where the inotify event from our own save arrives
+                        // before last_saved_time is updated by handle_document_write.
+                        if self.editor.write_count > 0 {
+                            self.deferred_file_events.push(path);
+                        } else {
+                            self.handle_file_changed(path);
+                            self.render().await;
+                        }
                     }
                 }
             }
@@ -682,6 +701,17 @@ impl Application {
             "'{}' written, {lines}L {size}",
             get_relative_path(&doc_save_event.path).to_string_lossy(),
         ));
+
+        // Process any file events that were deferred while write_count > 0.
+        // Now that last_saved_time is up to date, the mtime guard will correctly
+        // distinguish our own saves from external changes.
+        #[cfg(target_os = "linux")]
+        if self.editor.config().auto_reload.enable && self.editor.write_count == 0 {
+            let deferred = std::mem::take(&mut self.deferred_file_events);
+            for path in deferred {
+                self.handle_file_changed(path);
+            }
+        }
     }
 
     #[inline(always)]
@@ -1380,8 +1410,10 @@ impl Application {
         errs
     }
 
-    /// Sync the set of watched paths to match currently open documents.
+    /// Sync the set of watched directories to match currently open documents.
     /// Called after each event loop iteration to keep the watcher up to date.
+    /// We watch parent directories rather than file inodes so that atomic
+    /// writes (write-temp-then-rename) are detected via the directory rename event.
     #[cfg(target_os = "linux")]
     fn sync_watched_paths(&mut self) {
         use notify::Watcher;
@@ -1389,19 +1421,19 @@ impl Application {
             return;
         };
 
-        let current_paths: std::collections::HashSet<std::path::PathBuf> = self
+        let current_dirs: std::collections::HashSet<std::path::PathBuf> = self
             .editor
             .documents()
-            .filter_map(|doc| doc.path().map(|p| p.to_path_buf()))
+            .filter_map(|doc| doc.path()?.parent().map(|d| d.to_path_buf()))
             .collect();
 
-        for path in current_paths.difference(&self.watched_paths) {
-            let _ = watcher.watch(path, notify::RecursiveMode::NonRecursive);
+        for dir in current_dirs.difference(&self.watched_dirs) {
+            let _ = watcher.watch(dir, notify::RecursiveMode::NonRecursive);
         }
-        for path in self.watched_paths.difference(&current_paths) {
-            let _ = watcher.unwatch(path);
+        for dir in self.watched_dirs.difference(&current_dirs) {
+            let _ = watcher.unwatch(dir);
         }
-        self.watched_paths = current_paths;
+        self.watched_dirs = current_dirs;
     }
 
     /// Handle a file-changed event from the watcher.
