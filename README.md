@@ -126,6 +126,18 @@ Single-line cursor produces `#L42`; a visual selection produces `#L42-L55`.
 
 The URL is displayed in the status bar after copying.
 
+## Global indentation settings
+
+Set a global tab width and indent style that applies to all files without a language-specific override. Language config in `languages.toml` and `.editorconfig` files take precedence.
+
+```toml
+[editor]
+indent-style = "spaces"   # "spaces" or "tabs"
+tab-width = 4             # number of spaces per indent level
+```
+
+Priority (highest wins): `.editorconfig` → language config (`languages.toml`) → global editor config → built-in default (tabs, width 4).
+
 ## Auto file reload (Linux only)
 
 Automatically reloads open buffers when their files change on disk. Reloads are instantaneous — uses inotify directory watching, so atomic saves (vim, emacs, most editors) are detected correctly. Disabled by default. When a buffer has unsaved changes, a prompt is shown before reloading.
