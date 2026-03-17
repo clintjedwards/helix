@@ -483,6 +483,17 @@ pub struct Config {
     pub buffer_picker: BufferPickerConfig,
     /// Automatic file reloading when files change on disk. Linux only.
     pub auto_reload: AutoReloadConfig,
+    /// Global fallback tab width. Overridden by per-language indent config and .editorconfig.
+    pub tab_width: Option<usize>,
+    /// Global fallback indent style. Overridden by per-language config, .editorconfig, and file auto-detection.
+    pub indent_style: Option<DefaultIndentStyle>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum DefaultIndentStyle {
+    Tabs,
+    Spaces,
 }
 
 #[derive(Debug, Default, PartialEq, Eq, PartialOrd, Ord, Deserialize, Serialize, Clone, Copy)]
@@ -1203,6 +1214,8 @@ impl Default for Config {
             kitty_keyboard_protocol: Default::default(),
             buffer_picker: BufferPickerConfig::default(),
             auto_reload: AutoReloadConfig::default(),
+            tab_width: None,
+            indent_style: None,
         }
     }
 }

@@ -44,7 +44,7 @@ use helix_core::{
 };
 
 use crate::{
-    editor::Config,
+    editor::{Config, DefaultIndentStyle},
     events::{DocumentDidChange, SelectionDidChange},
     expansion,
     view::ViewPosition,
@@ -1172,7 +1172,19 @@ impl Document {
             auto_detect_indent_style(&self.text).unwrap_or_else(|| {
                 self.language_config()
                     .and_then(|config| config.indent.as_ref())
-                    .map_or(DEFAULT_INDENT, |config| IndentStyle::from_str(&config.unit))
+                    .map_or_else(
+                        || {
+                            let config = self.config.load();
+                            match config.indent_style {
+                                Some(DefaultIndentStyle::Spaces) => {
+                                    let width = config.tab_width.unwrap_or(DEFAULT_TAB_WIDTH);
+                                    IndentStyle::Spaces(width as u8)
+                                }
+                                _ => DEFAULT_INDENT,
+                            }
+                        },
+                        |config| IndentStyle::from_str(&config.unit),
+                    )
             })
         };
         if let Some(line_ending) = self
@@ -1920,7 +1932,15 @@ impl Document {
             .unwrap_or_else(|| {
                 self.language_config()
                     .and_then(|config| config.indent.as_ref())
-                    .map_or(DEFAULT_TAB_WIDTH, |config| config.tab_width)
+                    .map_or_else(
+                        || {
+                            self.config
+                                .load()
+                                .tab_width
+                                .unwrap_or(DEFAULT_TAB_WIDTH)
+                        },
+                        |config| config.tab_width,
+                    )
             })
     }
 
