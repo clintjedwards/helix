@@ -45,6 +45,7 @@ pub struct SearchOptions {
     pub match_case: bool,
     pub regex_mode: bool,
     pub whole_word: bool,
+    pub preserve_case: bool,
 }
 
 /// Where the actual match offsets come from.
@@ -440,16 +441,26 @@ impl SearchReplace {
     // ── Replacement ────────────────────────────────────────────────────────
 
     fn compute_replacement_for(&self, matched_text: &str) -> String {
-        if self.options.regex_mode && self.replace_input.contains('$') {
-            if let Ok(re) = regex::Regex::new(&self.search_input) {
-                if let Some(caps) = re.captures(matched_text) {
-                    let mut dest = String::new();
-                    caps.expand(&self.replace_input, &mut dest);
-                    return dest;
-                }
-            }
+        let base = if self.options.regex_mode && self.replace_input.contains('$') {
+            regex::Regex::new(&self.search_input)
+                .ok()
+                .and_then(|re| {
+                    re.captures(matched_text).map(|caps| {
+                        let mut dest = String::new();
+                        caps.expand(&self.replace_input, &mut dest);
+                        dest
+                    })
+                })
+                .unwrap_or_else(|| self.replace_input.clone())
+        } else {
+            self.replace_input.clone()
+        };
+
+        if self.options.preserve_case {
+            preserve_case(matched_text, &base)
+        } else {
+            base
         }
-        self.replace_input.clone()
     }
 
     /// Apply the replacement for exactly the result at `index`, then remove it
@@ -459,10 +470,18 @@ impl SearchReplace {
             return self.results.is_empty();
         };
 
-        let view_id = view!(cx.editor).id;
+        let (view_id, current_doc_id) = {
+            let view = view!(cx.editor);
+            (view.id, view.doc)
+        };
         let mut applied = false;
 
-        if let Ok(doc_id) = cx.editor.open(&result.path, Action::Load) {
+        let doc_id = match &result.location {
+            MatchLocation::BufferChars { .. } => Ok(current_doc_id),
+            MatchLocation::FileBytes { .. } => cx.editor.open(&result.path, Action::Load),
+        };
+
+        if let Ok(doc_id) = doc_id {
             let doc = doc_mut!(cx.editor, &doc_id);
             let text = doc.text().clone();
 
@@ -527,7 +546,10 @@ impl SearchReplace {
             by_path.entry(r.path.clone()).or_default().push(r);
         }
 
-        let view_id = view!(cx.editor).id;
+        let (view_id, current_doc_id) = {
+            let view = view!(cx.editor);
+            (view.id, view.doc)
+        };
         let mut applied = 0usize;
         let mut errors = 0usize;
 
@@ -549,16 +571,19 @@ impl SearchReplace {
                 a_key.cmp(&b_key)
             });
 
-            let doc_id = match cx.editor.open(&file_path, Action::Load) {
-                Ok(id) => id,
-                Err(e) => {
-                    log::error!(
-                        "search_replace: failed to open {}: {e}",
-                        file_path.display()
-                    );
-                    errors += 1;
-                    continue;
-                }
+            let doc_id = match matches.first().map(|m| &m.location) {
+                Some(MatchLocation::BufferChars { .. }) => current_doc_id,
+                _ => match cx.editor.open(&file_path, Action::Load) {
+                    Ok(id) => id,
+                    Err(e) => {
+                        log::error!(
+                            "search_replace: failed to open {}: {e}",
+                            file_path.display()
+                        );
+                        errors += 1;
+                        continue;
+                    }
+                },
             };
 
             let doc = doc_mut!(cx.editor, &doc_id);
@@ -648,6 +673,42 @@ fn build_pattern(input: &str, opts: &SearchOptions) -> String {
         pat = format!(r"\b{}\b", pat);
     }
     pat
+}
+
+fn preserve_case(matched: &str, replacement: &str) -> String {
+    if replacement.is_empty() {
+        return replacement.to_string();
+    }
+    let has_lower = matched.chars().any(|c| c.is_lowercase());
+    let has_upper = matched.chars().any(|c| c.is_uppercase());
+
+    if has_upper && !has_lower {
+        return replacement.to_uppercase();
+    }
+    if has_lower && !has_upper {
+        return replacement.to_lowercase();
+    }
+
+    let first_is_upper = matched
+        .chars()
+        .find(|c| c.is_alphabetic())
+        .is_some_and(|c| c.is_uppercase());
+    if first_is_upper && has_lower {
+        let mut out = String::with_capacity(replacement.len());
+        let mut done = false;
+        for c in replacement.chars() {
+            if !done && c.is_alphabetic() {
+                out.extend(c.to_uppercase());
+                done = true;
+            } else {
+                out.extend(c.to_lowercase());
+            }
+        }
+        return out;
+    }
+
+    // Mixed / ambiguous / no cased chars: leave as typed.
+    replacement.to_string()
 }
 
 fn run_workspace_search(
@@ -843,6 +904,11 @@ impl Component for SearchReplace {
                 self.on_search_input_changed(cx);
                 return EventResult::Consumed(None);
             }
+            alt!('p') => {
+                self.options.preserve_case = !self.options.preserve_case;
+                self.on_search_input_changed(cx);
+                return EventResult::Consumed(None);
+            }
             _ => {}
         }
 
@@ -956,7 +1022,7 @@ impl Component for SearchReplace {
                         }
                     }
                     // R: replace all selected results at once
-                    key!('R') => {
+                    key!('R') | shift!('R') => {
                         self.apply_replacements(cx);
                         if self.results.is_empty() {
                             return close_fn;
@@ -1032,6 +1098,7 @@ impl Component for SearchReplace {
             ("match-case", "alt-c", self.options.match_case),
             ("regex", "alt-r", self.options.regex_mode),
             ("whole-word", "alt-w", self.options.whole_word),
+            ("preserve-case", "alt-p", self.options.preserve_case),
         ];
 
         let mut x = inner.x;
