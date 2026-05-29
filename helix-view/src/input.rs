@@ -174,7 +174,7 @@ impl fmt::Display for KeyEvent {
                 ""
             },
             if self.modifiers.contains(KeyModifiers::ALT) {
-                "A-"
+                "Alt-"
             } else {
                 ""
             },
@@ -312,7 +312,8 @@ impl UnicodeWidthStr for KeyEvent {
             width += 2;
         }
         if self.modifiers.contains(KeyModifiers::ALT) {
-            width += 2;
+            // "Alt-"
+            width += 4;
         }
         if self.modifiers.contains(KeyModifiers::CONTROL) {
             width += 2;
