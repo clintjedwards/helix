@@ -1300,6 +1300,11 @@ pub struct Editor {
     pub autoinfo: Option<Info>,
 
     pub config: Arc<dyn DynAccess<Config>>,
+    /// A config update staged by a config-mutating command (e.g. `:set`,
+    /// `:toggle`) but not yet applied by the application. Lets several such
+    /// commands run in a single keybinding sequence build on each other
+    /// instead of each starting from the already-applied config.
+    pub pending_config: Option<Config>,
     pub auto_pairs: Option<AutoPairs>,
 
     pub idle_timer: Pin<Box<Sleep>>,
@@ -1444,6 +1449,7 @@ impl Editor {
             last_completion: None,
             last_cwd: None,
             config,
+            pending_config: None,
             auto_pairs,
             exit_code: 0,
             config_events: unbounded_channel(),
@@ -1485,6 +1491,26 @@ impl Editor {
 
     pub fn config(&self) -> DynGuard<Config> {
         self.config.load()
+    }
+
+    /// The most recently staged config, or the active config if none is
+    /// staged. Config-mutating commands read through this so that several of
+    /// them in a single keybinding sequence observe each other's changes.
+    pub fn pending_config_snapshot(&self) -> Config {
+        self.pending_config
+            .clone()
+            .unwrap_or_else(|| self.config().clone())
+    }
+
+    /// Stage `config` and notify the application to apply it. The staged copy
+    /// is observed by [`Editor::pending_config_snapshot`] until the
+    /// application applies it and clears `pending_config`.
+    pub fn update_config(
+        &mut self,
+        config: Box<Config>,
+    ) -> Result<(), tokio::sync::mpsc::error::SendError<ConfigEvent>> {
+        self.pending_config = Some((*config).clone());
+        self.config_events.0.send(ConfigEvent::Update(config))
     }
 
     /// Call if the config has changed to let the editor update all

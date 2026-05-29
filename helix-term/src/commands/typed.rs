@@ -2327,7 +2327,7 @@ fn set_option(cx: &mut compositor::Context, args: Args, event: PromptEvent) -> a
     let key_error = || anyhow::anyhow!("Unknown key `{}`", key);
     let field_error = |_| anyhow::anyhow!("Could not parse field `{}`", arg);
 
-    let mut config = serde_json::json!(&cx.editor.config().deref());
+    let mut config = serde_json::json!(&cx.editor.pending_config_snapshot());
     let pointer = format!("/{}", key.replace('.', "/"));
     let value = config.pointer_mut(&pointer).ok_or_else(key_error)?;
 
@@ -2339,10 +2339,7 @@ fn set_option(cx: &mut compositor::Context, args: Args, event: PromptEvent) -> a
     };
     let config = serde_json::from_value(config).map_err(field_error)?;
 
-    cx.editor
-        .config_events
-        .0
-        .send(ConfigEvent::Update(config))?;
+    cx.editor.update_config(config)?;
     Ok(())
 }
 
@@ -2362,7 +2359,7 @@ fn toggle_option(
 
     let key_error = || anyhow::anyhow!("Unknown key `{}`", key);
 
-    let mut config = serde_json::json!(&cx.editor.config().deref());
+    let mut config = serde_json::json!(&cx.editor.pending_config_snapshot());
     let pointer = format!("/{}", key.replace('.', "/"));
     let value = config.pointer_mut(&pointer).ok_or_else(key_error)?;
 
@@ -2434,10 +2431,7 @@ fn toggle_option(
     let config = serde_json::from_value(config)
         .map_err(|err| anyhow::anyhow!("Failed to parse config: {err}"))?;
 
-    cx.editor
-        .config_events
-        .0
-        .send(ConfigEvent::Update(config))?;
+    cx.editor.update_config(config)?;
     cx.editor.set_status(status);
     Ok(())
 }

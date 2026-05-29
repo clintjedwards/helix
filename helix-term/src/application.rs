@@ -460,6 +460,9 @@ impl Application {
             }
         }
 
+        // The staged config (if any) has now been applied or superseded.
+        self.editor.pending_config = None;
+
         // Update all the relevant members in the editor after updating
         // the configuration.
         self.editor.refresh_config(&old_editor_config);
