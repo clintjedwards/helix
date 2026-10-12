@@ -5,6 +5,8 @@
 | `move_char_right` | Move right | normal: `` l ``, `` <right> ``, insert: `` <right> `` |
 | `move_line_up` | Move up | normal: `` gk `` |
 | `move_line_down` | Move down | normal: `` gj `` |
+| `drag_line_up` | Move selected lines up | normal: `` <C-k> ``, `` <S-C-up> ``, select: `` <C-k> ``, `` <S-C-up> `` |
+| `drag_line_down` | Move selected lines down | normal: `` <C-j> ``, `` <S-C-down> ``, select: `` <C-j> ``, `` <S-C-down> `` |
 | `move_visual_line_up` | Move up | normal: `` k ``, `` <up> ``, insert: `` <up> `` |
 | `move_visual_line_down` | Move down | normal: `` j ``, `` <down> ``, insert: `` <down> `` |
 | `extend_char_left` | Extend left | select: `` h ``, `` <left> `` |
@@ -14,7 +16,7 @@
 | `extend_visual_line_up` | Extend up | select: `` k ``, `` <up> `` |
 | `extend_visual_line_down` | Extend down | select: `` j ``, `` <down> `` |
 | `copy_selection_on_next_line` | Copy selection on next line | normal: `` C ``, select: `` C `` |
-| `copy_selection_on_prev_line` | Copy selection on previous line | normal: `` <A-C> ``, select: `` <A-C> `` |
+| `copy_selection_on_prev_line` | Copy selection on previous line | normal: `` <Alt-C> ``, select: `` <Alt-C> `` |
 | `move_next_word_start` | Move to start of next word | normal: `` w `` |
 | `move_prev_word_start` | Move to start of previous word | normal: `` b `` |
 | `move_next_word_end` | Move to end of next word | normal: `` e `` |
@@ -27,8 +29,8 @@
 | `move_prev_sub_word_start` | Move to start of previous sub word |  |
 | `move_next_sub_word_end` | Move to end of next sub word |  |
 | `move_prev_sub_word_end` | Move to end of previous sub word |  |
-| `move_parent_node_end` | Move to end of the parent node | normal: `` <A-e> `` |
-| `move_parent_node_start` | Move to beginning of the parent node | normal: `` <A-b> `` |
+| `move_parent_node_end` | Move to end of the parent node | normal: `` <Alt-e> `` |
+| `move_parent_node_start` | Move to beginning of the parent node | normal: `` <Alt-b> `` |
 | `extend_next_word_start` | Extend to start of next word | select: `` w `` |
 | `extend_prev_word_start` | Extend to start of previous word | select: `` b `` |
 | `extend_next_word_end` | Extend to end of next word | select: `` e `` |
@@ -41,8 +43,8 @@
 | `extend_prev_sub_word_start` | Extend to start of previous sub word |  |
 | `extend_next_sub_word_end` | Extend to end of next sub word |  |
 | `extend_prev_sub_word_end` | Extend to end of prev sub word |  |
-| `extend_parent_node_end` | Extend to end of the parent node | select: `` <A-e> `` |
-| `extend_parent_node_start` | Extend to beginning of the parent node | select: `` <A-b> `` |
+| `extend_parent_node_end` | Extend to end of the parent node | select: `` <Alt-e> `` |
+| `extend_parent_node_start` | Extend to beginning of the parent node | select: `` <Alt-b> `` |
 | `find_till_char` | Move till next occurrence of char | normal: `` t `` |
 | `find_next_char` | Move to next occurrence of char | normal: `` f `` |
 | `extend_till_char` | Extend till next occurrence of char | select: `` t `` |
@@ -51,10 +53,10 @@
 | `find_prev_char` | Move to previous occurrence of char | normal: `` F `` |
 | `extend_till_prev_char` | Extend till previous occurrence of char | select: `` T `` |
 | `extend_prev_char` | Extend to previous occurrence of char | select: `` F `` |
-| `repeat_last_motion` | Repeat last motion | normal: `` <A-.> ``, select: `` <A-.> `` |
+| `repeat_last_motion` | Repeat last motion | normal: `` <Alt-.> ``, select: `` <Alt-.> `` |
 | `replace` | Replace with new char | normal: `` r ``, select: `` r `` |
 | `switch_case` | Switch (toggle) case | normal: `` ~ ``, select: `` ~ `` |
-| `switch_to_uppercase` | Switch to uppercase | normal: `` <A-`> ``, select: `` <A-`> `` |
+| `switch_to_uppercase` | Switch to uppercase | normal: `` <Alt-`> ``, select: `` <Alt-`> `` |
 | `switch_to_lowercase` | Switch to lowercase | normal: `` ` ``, select: `` ` `` |
 | `page_up` | Move page up | normal: `` <C-b> ``, `` Z<C-b> ``, `` z<C-b> ``, `` <pageup> ``, `` Z<pageup> ``, `` z<pageup> ``, select: `` <C-b> ``, `` Z<C-b> ``, `` z<C-b> ``, `` <pageup> ``, `` Z<pageup> ``, `` z<pageup> ``, insert: `` <pageup> `` |
 | `page_down` | Move page down | normal: `` <C-f> ``, `` Z<C-f> ``, `` z<C-f> ``, `` <pagedown> ``, `` Z<pagedown> ``, `` z<pagedown> ``, select: `` <C-f> ``, `` Z<C-f> ``, `` z<C-f> ``, `` <pagedown> ``, `` Z<pagedown> ``, `` z<pagedown> ``, insert: `` <pagedown> `` |
@@ -67,16 +69,16 @@
 | `select_all` | Select whole document | normal: `` % ``, select: `` % `` |
 | `select_regex` | Select all regex matches inside selections | normal: `` s ``, select: `` s `` |
 | `split_selection` | Split selections on regex matches | normal: `` S ``, select: `` S `` |
-| `split_selection_on_newline` | Split selection on newlines | normal: `` <A-s> ``, select: `` <A-s> `` |
-| `merge_selections` | Merge selections | normal: `` <A-minus> ``, select: `` <A-minus> `` |
-| `merge_consecutive_selections` | Merge consecutive selections | normal: `` <A-_> ``, select: `` <A-_> `` |
+| `split_selection_on_newline` | Split selection on newlines | normal: `` <Alt-s> ``, select: `` <Alt-s> `` |
+| `merge_selections` | Merge selections | normal: `` <Alt-minus> ``, select: `` <Alt-minus> `` |
+| `merge_consecutive_selections` | Merge consecutive selections | normal: `` <Alt-_> ``, select: `` <Alt-_> `` |
 | `search` | Search for regex pattern | normal: `` / ``, `` Z/ ``, `` z/ ``, select: `` / ``, `` Z/ ``, `` z/ `` |
 | `rsearch` | Reverse search for regex pattern | normal: `` ? ``, `` Z? ``, `` z? ``, select: `` ? ``, `` Z? ``, `` z? `` |
 | `search_next` | Select next search match | normal: `` n ``, `` Zn ``, `` zn ``, select: `` Zn ``, `` zn `` |
 | `search_prev` | Select previous search match | normal: `` N ``, `` ZN ``, `` zN ``, select: `` ZN ``, `` zN `` |
 | `extend_search_next` | Add next search match to selection | select: `` n `` |
 | `extend_search_prev` | Add previous search match to selection | select: `` N `` |
-| `search_selection` | Use current selection as search pattern | normal: `` <A-*> ``, select: `` <A-*> `` |
+| `search_selection` | Use current selection as search pattern | normal: `` <Alt-*> ``, select: `` <Alt-*> `` |
 | `search_selection_detect_word_boundaries` | Use current selection as the search pattern, automatically wrapping with `\b` on word boundaries | normal: `` * ``, select: `` * `` |
 | `make_search_word_bounded` | Modify current search to make it word bounded |  |
 | `global_search` | Global search in workspace folder | normal: `` <space>/ ``, select: `` <space>/ `` |
@@ -86,14 +88,14 @@
 | `select_line_above` | Select current line, if already selected, extend or shrink line above based on the anchor |  |
 | `select_line_below` | Select current line, if already selected, extend or shrink line below based on the anchor |  |
 | `extend_to_line_bounds` | Extend selection to line bounds | normal: `` X ``, select: `` X `` |
-| `shrink_to_line_bounds` | Shrink selection to line bounds | normal: `` <A-x> ``, select: `` <A-x> `` |
+| `shrink_to_line_bounds` | Shrink selection to line bounds | normal: `` <Alt-x> ``, select: `` <Alt-x> `` |
 | `delete_selection` | Delete selection | normal: `` d ``, select: `` d `` |
-| `delete_selection_noyank` | Delete selection without yanking | normal: `` <A-d> ``, select: `` <A-d> `` |
+| `delete_selection_noyank` | Delete selection without yanking | normal: `` <Alt-d> ``, select: `` <Alt-d> `` |
 | `change_selection` | Change selection | normal: `` c ``, select: `` c `` |
-| `change_selection_noyank` | Change selection without yanking | normal: `` <A-c> ``, select: `` <A-c> `` |
+| `change_selection_noyank` | Change selection without yanking | normal: `` <Alt-c> ``, select: `` <Alt-c> `` |
 | `collapse_selection` | Collapse selection into single cursor | normal: `` ; ``, select: `` ; `` |
-| `flip_selections` | Flip selection cursor and anchor | normal: `` <A-;> ``, select: `` <A-;> `` |
-| `ensure_selections_forward` | Ensure all selections face forward | normal: `` <A-:> ``, select: `` <A-:> `` |
+| `flip_selections` | Flip selection cursor and anchor | normal: `` <Alt-;> ``, select: `` <Alt-;> `` |
+| `ensure_selections_forward` | Ensure all selections face forward | normal: `` <Alt-:> ``, select: `` <Alt-:> `` |
 | `insert_mode` | Insert before selection | normal: `` i ``, select: `` i `` |
 | `append_mode` | Append after selection | normal: `` a ``, select: `` a `` |
 | `command_mode` | Enter command mode | normal: `` : ``, select: `` : `` |
@@ -112,6 +114,7 @@
 | `syntax_symbol_picker` | Open symbol picker from syntax information |  |
 | `lsp_or_syntax_symbol_picker` | Open symbol picker from LSP or syntax information | normal: `` <space>s ``, select: `` <space>s `` |
 | `changed_file_picker` | Open changed file picker | normal: `` <space>g ``, select: `` <space>g `` |
+| `git_permalink` | Copy GitHub permalink for current selection to clipboard | normal: `` <space>l ``, select: `` <space>l `` |
 | `select_references_to_symbol_under_cursor` | Select symbol references | normal: `` <space>h ``, select: `` <space>h `` |
 | `workspace_symbol_picker` | Open workspace symbol picker |  |
 | `syntax_workspace_symbol_picker` | Open workspace symbol picker from syntax information |  |
@@ -119,7 +122,7 @@
 | `diagnostics_picker` | Open diagnostic picker | normal: `` <space>d ``, select: `` <space>d `` |
 | `workspace_diagnostics_picker` | Open workspace diagnostic picker | normal: `` <space>D ``, select: `` <space>D `` |
 | `lsp_info` | Show status of language servers for current document |  |
-| `search_replace` | Open interactive search and replace panel | normal: `` <space><A-/> ``, select: `` <space><A-/> `` |
+| `search_replace` | Open interactive search and replace panel | normal: `` <space><Alt-/> ``, select: `` <space><Alt-/> `` |
 | `last_picker` | Open last picker | normal: `` <space>' ``, select: `` <space>' `` |
 | `insert_at_line_start` | Insert at start of line | normal: `` I ``, select: `` I `` |
 | `insert_at_line_end` | Insert at end of line | normal: `` A ``, select: `` A `` |
@@ -180,15 +183,15 @@
 | `append_char_interactive` | Append an interactively-chosen char |  |
 | `delete_char_backward` | Delete previous char | insert: `` <C-h> ``, `` <backspace> ``, `` <S-backspace> `` |
 | `delete_char_forward` | Delete next char | insert: `` <C-d> ``, `` <del> `` |
-| `delete_word_backward` | Delete previous word | insert: `` <C-w> ``, `` <A-backspace> `` |
-| `delete_word_forward` | Delete next word | insert: `` <A-d> ``, `` <A-del> `` |
+| `delete_word_backward` | Delete previous word | insert: `` <C-w> ``, `` <Alt-backspace> `` |
+| `delete_word_forward` | Delete next word | insert: `` <Alt-d> ``, `` <Alt-del> `` |
 | `kill_to_line_start` | Delete till start of line | insert: `` <C-u> `` |
 | `kill_to_line_end` | Delete till end of line | insert: `` <C-k> `` |
 | `undo` | Undo change | normal: `` u ``, select: `` u `` |
 | `redo` | Redo change | normal: `` U ``, select: `` U `` |
-| `earlier` | Move backward in history | normal: `` <A-u> ``, select: `` <A-u> `` |
-| `later` | Move forward in history | normal: `` <A-U> ``, select: `` <A-U> `` |
-| `commit_undo_checkpoint` | Commit changes to new checkpoint | insert: `` <C-s> `` |
+| `earlier` | Move backward in history | normal: `` <Alt-u> ``, select: `` <Alt-u> `` |
+| `later` | Move forward in history | normal: `` <Alt-U> ``, select: `` <Alt-U> `` |
+| `commit_undo_checkpoint` | Commit changes to new checkpoint |  |
 | `yank` | Yank selection | normal: `` y ``, select: `` y `` |
 | `yank_to_clipboard` | Yank selections to clipboard | normal: `` <space>y ``, select: `` <space>y `` |
 | `yank_to_primary_clipboard` | Yank selections to primary clipboard |  |
@@ -210,31 +213,32 @@
 | `unindent` | Unindent selection | normal: `` <lt> ``, select: `` <lt> `` |
 | `format_selections` | Format selection | normal: `` = ``, select: `` = `` |
 | `join_selections` | Join lines inside selection | normal: `` J ``, select: `` J `` |
-| `join_selections_space` | Join lines inside selection and select spaces | normal: `` <A-J> ``, select: `` <A-J> `` |
+| `join_selections_space` | Join lines inside selection and select spaces | normal: `` <Alt-J> ``, select: `` <Alt-J> `` |
 | `keep_selections` | Keep selections matching regex | normal: `` K ``, select: `` K `` |
-| `remove_selections` | Remove selections matching regex | normal: `` <A-K> ``, select: `` <A-K> `` |
+| `remove_selections` | Remove selections matching regex | normal: `` <Alt-K> ``, select: `` <Alt-K> `` |
 | `align_selections` | Align selections in column | normal: `` & ``, select: `` & `` |
 | `keep_primary_selection` | Keep primary selection | normal: `` , ``, select: `` , `` |
-| `remove_primary_selection` | Remove primary selection | normal: `` <A-,> ``, select: `` <A-,> `` |
+| `remove_primary_selection` | Remove primary selection | normal: `` <Alt-,> ``, select: `` <Alt-,> `` |
 | `completion` | Invoke completion popup | insert: `` <C-x> `` |
 | `hover` | Show docs for item under cursor | normal: `` <space>k ``, select: `` <space>k `` |
 | `toggle_comments` | Comment/uncomment selections | normal: `` <C-c> ``, `` <space>c ``, select: `` <C-c> ``, `` <space>c `` |
-| `toggle_line_comments` | Line comment/uncomment selections | normal: `` <space><A-c> ``, select: `` <space><A-c> `` |
+| `toggle_line_comments` | Line comment/uncomment selections | normal: `` <space><Alt-c> ``, select: `` <space><Alt-c> `` |
 | `toggle_block_comments` | Block comment/uncomment selections | normal: `` <space>C ``, select: `` <space>C `` |
 | `rotate_selections_forward` | Rotate selections forward | normal: `` ) ``, select: `` ) `` |
 | `rotate_selections_backward` | Rotate selections backward | normal: `` ( ``, select: `` ( `` |
-| `rotate_selection_contents_forward` | Rotate selection contents forward | normal: `` <A-)> ``, select: `` <A-)> `` |
-| `rotate_selection_contents_backward` | Rotate selections contents backward | normal: `` <A-(> ``, select: `` <A-(> `` |
+| `rotate_selection_contents_forward` | Rotate selection contents forward | normal: `` <Alt-)> ``, select: `` <Alt-)> `` |
+| `rotate_selection_contents_backward` | Rotate selections contents backward | normal: `` <Alt-(> ``, select: `` <Alt-(> `` |
 | `reverse_selection_contents` | Reverse selections contents |  |
-| `expand_selection` | Expand selection to parent syntax node | normal: `` <A-o> ``, `` <A-up> ``, select: `` <A-o> ``, `` <A-up> `` |
-| `shrink_selection` | Shrink selection to previously expanded syntax node | normal: `` <A-i> ``, `` <A-down> ``, select: `` <A-i> ``, `` <A-down> `` |
-| `select_next_sibling` | Select next sibling in the syntax tree | normal: `` <A-n> ``, `` <A-right> ``, select: `` <A-n> ``, `` <A-right> `` |
-| `select_prev_sibling` | Select previous sibling the in syntax tree | normal: `` <A-p> ``, `` <A-left> ``, select: `` <A-p> ``, `` <A-left> `` |
-| `select_all_siblings` | Select all siblings of the current node | normal: `` <A-a> ``, select: `` <A-a> `` |
-| `select_all_children` | Select all children of the current node | normal: `` <A-I> ``, `` <S-A-down> ``, select: `` <A-I> ``, `` <S-A-down> `` |
+| `expand_selection` | Expand selection to parent syntax node | normal: `` <Alt-o> ``, `` <Alt-up> ``, select: `` <Alt-o> ``, `` <Alt-up> `` |
+| `shrink_selection` | Shrink selection to previously expanded syntax node | normal: `` <Alt-i> ``, `` <Alt-down> ``, select: `` <Alt-i> ``, `` <Alt-down> `` |
+| `select_next_sibling` | Select next sibling in the syntax tree | normal: `` <Alt-n> ``, `` <Alt-right> ``, select: `` <Alt-n> ``, `` <Alt-right> `` |
+| `select_prev_sibling` | Select previous sibling the in syntax tree | normal: `` <Alt-p> ``, `` <Alt-left> ``, select: `` <Alt-p> ``, `` <Alt-left> `` |
+| `select_all_siblings` | Select all siblings of the current node | normal: `` <Alt-a> ``, select: `` <Alt-a> `` |
+| `select_all_children` | Select all children of the current node | normal: `` <Alt-I> ``, `` <S-Alt-down> ``, select: `` <Alt-I> ``, `` <S-Alt-down> `` |
 | `jump_forward` | Jump forward on jumplist | normal: `` <C-i> ``, `` <tab> ``, select: `` <C-i> ``, `` <tab> `` |
 | `jump_backward` | Jump backward on jumplist | normal: `` <C-o> ``, select: `` <C-o> `` |
-| `save_selection` | Save current selection to jumplist | normal: `` <C-s> ``, select: `` <C-s> `` |
+| `save_selection` | Save current selection to jumplist |  |
+| `write_buffer` | Write changes to disk | normal: `` <C-s> ``, select: `` <C-s> ``, insert: `` <C-s> `` |
 | `jump_view_right` | Jump to right split | normal: `` <C-w>l ``, `` <space>wl ``, `` <C-w><C-l> ``, `` <C-w><right> ``, `` <space>w<C-l> ``, `` <space>w<right> ``, select: `` <C-w>l ``, `` <space>wl ``, `` <C-w><C-l> ``, `` <C-w><right> ``, `` <space>w<C-l> ``, `` <space>w<right> `` |
 | `jump_view_left` | Jump to left split | normal: `` <C-w>h ``, `` <space>wh ``, `` <C-w><C-h> ``, `` <C-w><left> ``, `` <space>w<C-h> ``, `` <space>w<left> ``, select: `` <C-w>h ``, `` <space>wh ``, `` <C-w><C-h> ``, `` <C-w><left> ``, `` <space>w<C-h> ``, `` <space>w<left> `` |
 | `jump_view_up` | Jump to split above | normal: `` <C-w>k ``, `` <C-w><up> ``, `` <space>wk ``, `` <C-w><C-k> ``, `` <space>w<up> ``, `` <space>w<C-k> ``, select: `` <C-w>k ``, `` <C-w><up> ``, `` <space>wk ``, `` <C-w><C-k> ``, `` <space>w<up> ``, `` <space>w<C-k> `` |
@@ -300,9 +304,9 @@
 | `dap_enable_exceptions` | Enable exception breakpoints | normal: `` <space>Ge ``, select: `` <space>Ge `` |
 | `dap_disable_exceptions` | Disable exception breakpoints | normal: `` <space>GE ``, select: `` <space>GE `` |
 | `shell_pipe` | Pipe selections through shell command | normal: `` \| ``, select: `` \| `` |
-| `shell_pipe_to` | Pipe selections into shell command ignoring output | normal: `` <A-\|> ``, select: `` <A-\|> `` |
+| `shell_pipe_to` | Pipe selections into shell command ignoring output | normal: `` <Alt-\|> ``, select: `` <Alt-\|> `` |
 | `shell_insert_output` | Insert shell command output before selections | normal: `` ! ``, select: `` ! `` |
-| `shell_append_output` | Append shell command output after selections | normal: `` <A-!> ``, select: `` <A-!> `` |
+| `shell_append_output` | Append shell command output after selections | normal: `` <Alt-!> ``, select: `` <Alt-!> `` |
 | `shell_keep_pipe` | Filter selections with shell predicate | normal: `` $ ``, select: `` $ `` |
 | `suspend` | Suspend and return to shell | normal: `` <C-z> ``, select: `` <C-z> `` |
 | `rename_symbol` | Rename symbol | normal: `` <space>r ``, select: `` <space>r `` |

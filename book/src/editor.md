@@ -53,18 +53,18 @@
 | `undercurl` | Whether to override automatic detection of terminal undercurl support in the event of a false negative | `false` |
 | `rulers` | List of column positions at which to display the rulers. Can be overridden by language specific `rulers` in `languages.toml` file | `[]` |
 | `bufferline` | Renders a line at the top of the editor displaying open buffers. Can be `always`, `never` or `multiple` (only shown if more than one buffer is in use) | `"never"` |
-| `color-modes` | Whether to color the mode indicator with different colors depending on the mode itself | `false` |
+| `color-modes` | Whether to color the mode indicator with different colors depending on the mode itself | `true` |
 | `text-width` | Maximum line length. Used for the `:reflow` command and soft-wrapping if `soft-wrap.wrap-at-text-width` is set | `80` |
 | `workspace-lsp-roots` | Directories relative to the workspace root that are treated as LSP roots. Should only be set in `.helix/config.toml` | `[]` |
 | `default-line-ending` | The line ending to use for new documents. Can be `native`, `lf`, `crlf`, `ff`, `cr` or `nel`. `native` uses the platform's native line ending (`crlf` on Windows, otherwise `lf`). | `"native"` |
 | `insert-final-newline` | Whether to automatically insert a trailing line-ending on write if missing | `true` |
 | `atomic-save` | Whether to use atomic operations to write documents to disk. This prevents data loss if the editor is interrupted while writing the file, but may confuse some file watching/hot reloading programs. | `true` |
-| `trim-final-newlines` | Whether to automatically remove line-endings after the final one on write | `false` |
-| `trim-trailing-whitespace` | Whether to automatically remove whitespace preceding line endings on write | `false` |
+| `trim-final-newlines` | Whether to automatically remove line-endings after the final one on write | `true` |
+| `trim-trailing-whitespace` | Whether to automatically remove whitespace preceding line endings on write | `true` |
 | `popup-border` | Draw border around `popup`, `menu`, `all`, or `none` | `"none"` |
 | `indent-heuristic` | How the indentation for a newly inserted line is computed: `simple` just copies the indentation level from the previous line, `tree-sitter` computes the indentation based on the syntax tree and `hybrid` combines both approaches. If the chosen heuristic is not available, a different one will be used as a fallback (the fallback order being `hybrid` -> `tree-sitter` -> `simple`). | `"hybrid"` |
 | `tab-width` | Global fallback number of spaces per indentation level. Overridden by language-specific `indent.tab-width` in `languages.toml` and `.editorconfig`. | `4` |
-| `indent-style` | Global fallback indent style: `spaces` or `tabs`. Overridden by language-specific config, `.editorconfig`, and file auto-detection. When set to `spaces`, `tab-width` controls the number of spaces inserted. | (unset) |
+| `indent-style` | Global fallback indent style: `spaces` or `tabs`. Overridden by language-specific config, `.editorconfig`, and file auto-detection. When set to `spaces`, `tab-width` controls the number of spaces inserted. | `spaces` |
 | `jump-label-alphabet` | The characters that are used to generate two character jump labels. Characters at the start of the alphabet are used first. | `"abcdefghijklmnopqrstuvwxyz"` |
 | `end-of-line-diagnostics` | Minimum severity of diagnostics to render at the end of the line. Set to `disable` to disable entirely. Refer to the setting about `inline-diagnostics` for more details | `"hint"` |
 | `clipboard-provider` | Which API to use for clipboard interaction. One of `pasteboard` (MacOS), `wayland`, `x-clip`, `x-sel`, `win32-yank`, `termux`, `tmux`, `windows`, `termcode`, `none`, or a custom command set. | Platform and environment specific. |
@@ -123,7 +123,7 @@ The `[editor.statusline]` key takes the following sub-keys:
 
 | Key           | Description | Default |
 | ---           | ---         | ---     |
-| `left`        | A list of elements aligned to the left of the statusline | `["mode", "spinner", "file-name", "read-only-indicator", "file-modification-indicator"]` |
+| `left`        | A list of elements aligned to the left of the statusline | `["mode", "spinner", "version-control", "file-name", "read-only-indicator", "file-modification-indicator"]` |
 | `center`      | A list of elements aligned to the middle of the statusline | `[]` |
 | `right`       | A list of elements aligned to the right of the statusline | `["diagnostics", "selections", "register", "position", "file-encoding"]` |
 | `separator`   | The character used to separate elements in the statusline | `"│"` |
@@ -173,6 +173,7 @@ The following statusline elements can be configured:
 | `display-inlay-hints` | Display inlay hints[^2]                                     | `false` |
 | `inlay-hints-length-limit` | Maximum displayed length (non-zero number) of inlay hints | Unset by default  |
 | `display-color-swatches` | Show color swatches next to colors | `true` |
+| `display-semantic-tokens` | Layer language server semantic tokens on top of tree-sitter highlights | `true` |
 | `display-signature-help-docs` | Display docs under signature help popup             | `true`  |
 | `snippets`      | Enables snippet completions. Requires a server restart (`:lsp-restart`) to take effect after `:config-reload`/`:set`. | `true`  |
 | `goto-reference-include-declaration` | Include declaration in the goto references popup. | `true`  |
@@ -192,7 +193,7 @@ Valid values for these options are `block`, `bar`, `underline`, or `hidden`.
 | Key      | Description                                | Default   |
 | ---      | -----------                                | -------   |
 | `normal` | Cursor shape in [normal mode][normal mode] | `"block"` |
-| `insert` | Cursor shape in [insert mode][insert mode] | `"block"` |
+| `insert` | Cursor shape in [insert mode][insert mode] | `"bar"` |
 | `select` | Cursor shape in [select mode][select mode] | `"block"` |
 
 [normal mode]: ./keymap.md#normal-mode
@@ -316,7 +317,7 @@ Control auto save behavior.
 
 | Key | Description | Default |
 |--|--|---------|
-| `focus-lost` | Enable automatic saving on the focus moving away from Helix. Requires [focus event support](https://github.com/helix-editor/helix/wiki/Terminal-Support) from your terminal | `false` |
+| `focus-lost` | Enable automatic saving on the focus moving away from Helix. Requires [focus event support](https://github.com/helix-editor/helix/wiki/Terminal-Support) from your terminal | `true` |
 | `after-delay.enable` | Enable automatic saving after `auto-save.after-delay.timeout` milliseconds have passed since last edit. | `false` |
 | `after-delay.timeout` | Time in milliseconds since last edit before auto save timer triggers. | `3000` |
 
@@ -546,7 +547,7 @@ rather than silently discarding the in-memory edits.
 
 | Key                  | Description                                                                          | Default |
 | ---                  | ---                                                                                  | ---     |
-| `enable`             | Watch open files for external changes and reload them automatically                  | `false` |
+| `enable`             | Watch open files for external changes and reload them automatically                  | `true`  |
 | `prompt-if-modified` | Show a confirmation prompt before reloading a buffer that has unsaved changes        | `true`  |
 
 Example:

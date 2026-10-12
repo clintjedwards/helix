@@ -210,6 +210,10 @@ await = true
 [language-server.gopls]
 command = "gopls"
 
+[language-server.gopls.config]
+# gopls doesn't send semantic tokens unless asked to.
+semanticTokens = true
+
 [language-server.gopls.config.hints]
 assignVariableTypes = true
 compositeLiteralFields = true
@@ -228,6 +232,7 @@ command = ["golangci-lint", "run", "--output.json.path=stdout", "--show-stats=fa
 command = "rust-analyzer"
 
 [language-server.rust-analyzer.config]
+check.command = "clippy"
 inlayHints.bindingModeHints.enable = false
 inlayHints.closingBraceHints.minLines = 10
 inlayHints.closureReturnTypeHints.enable = "with_block"

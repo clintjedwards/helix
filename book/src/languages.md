@@ -241,6 +241,7 @@ The list of supported features is:
 - `inlay-hints`
 - `document-colors`
 - `call-hierarchy`
+- `semantic-tokens`
 
 ## Tree-sitter grammar configuration
 

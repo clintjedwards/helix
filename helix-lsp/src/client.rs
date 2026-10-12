@@ -51,6 +51,47 @@ fn workspace_for_uri(uri: lsp::Url) -> WorkspaceFolder {
     }
 }
 
+/// Every standard token type and modifier. Servers send whatever is in their own legend, so
+/// this mostly tells them we understand the standard set.
+const SEMANTIC_TOKEN_TYPES: &[lsp::SemanticTokenType] = &[
+    lsp::SemanticTokenType::NAMESPACE,
+    lsp::SemanticTokenType::TYPE,
+    lsp::SemanticTokenType::CLASS,
+    lsp::SemanticTokenType::ENUM,
+    lsp::SemanticTokenType::INTERFACE,
+    lsp::SemanticTokenType::STRUCT,
+    lsp::SemanticTokenType::TYPE_PARAMETER,
+    lsp::SemanticTokenType::PARAMETER,
+    lsp::SemanticTokenType::VARIABLE,
+    lsp::SemanticTokenType::PROPERTY,
+    lsp::SemanticTokenType::ENUM_MEMBER,
+    lsp::SemanticTokenType::EVENT,
+    lsp::SemanticTokenType::FUNCTION,
+    lsp::SemanticTokenType::METHOD,
+    lsp::SemanticTokenType::MACRO,
+    lsp::SemanticTokenType::KEYWORD,
+    lsp::SemanticTokenType::MODIFIER,
+    lsp::SemanticTokenType::COMMENT,
+    lsp::SemanticTokenType::STRING,
+    lsp::SemanticTokenType::NUMBER,
+    lsp::SemanticTokenType::REGEXP,
+    lsp::SemanticTokenType::OPERATOR,
+    lsp::SemanticTokenType::DECORATOR,
+];
+
+const SEMANTIC_TOKEN_MODIFIERS: &[lsp::SemanticTokenModifier] = &[
+    lsp::SemanticTokenModifier::DECLARATION,
+    lsp::SemanticTokenModifier::DEFINITION,
+    lsp::SemanticTokenModifier::READONLY,
+    lsp::SemanticTokenModifier::STATIC,
+    lsp::SemanticTokenModifier::DEPRECATED,
+    lsp::SemanticTokenModifier::ABSTRACT,
+    lsp::SemanticTokenModifier::ASYNC,
+    lsp::SemanticTokenModifier::MODIFICATION,
+    lsp::SemanticTokenModifier::DOCUMENTATION,
+    lsp::SemanticTokenModifier::DEFAULT_LIBRARY,
+];
+
 #[derive(Debug)]
 pub struct Client {
     id: LanguageServerId,
@@ -403,6 +444,7 @@ impl Client {
                         | CallHierarchyServerCapability::Options(_)
                 )
             ),
+            LanguageServerFeature::SemanticTokens => self.semantic_tokens_legend().is_some(),
         }
     }
 
@@ -608,6 +650,9 @@ impl Client {
                     inlay_hint: Some(lsp::InlayHintWorkspaceClientCapabilities {
                         refresh_support: Some(false),
                     }),
+                    semantic_tokens: Some(lsp::SemanticTokensWorkspaceClientCapabilities {
+                        refresh_support: Some(true),
+                    }),
                     workspace_edit: Some(lsp::WorkspaceEditClientCapabilities {
                         document_changes: Some(true),
                         resource_operations: Some(vec![
@@ -733,6 +778,23 @@ impl Client {
                     }),
                     call_hierarchy: Some(lsp::DynamicRegistrationClientCapabilities {
                         dynamic_registration: Some(false),
+                    }),
+                    semantic_tokens: Some(lsp::SemanticTokensClientCapabilities {
+                        dynamic_registration: Some(false),
+                        // Only full document requests for now. Ranges and deltas are
+                        // optimizations we can add if large files ever become a problem.
+                        requests: lsp::SemanticTokensClientCapabilitiesRequests {
+                            range: Some(false),
+                            full: Some(lsp::SemanticTokensFullOptions::Bool(true)),
+                        },
+                        token_types: SEMANTIC_TOKEN_TYPES.to_vec(),
+                        token_modifiers: SEMANTIC_TOKEN_MODIFIERS.to_vec(),
+                        formats: vec![lsp::TokenFormat::RELATIVE],
+                        overlapping_token_support: Some(false),
+                        multiline_token_support: Some(false),
+                        server_cancel_support: Some(false),
+                        // Tokens are layered on top of tree-sitter highlights.
+                        augments_syntax_tokens: Some(true),
                     }),
                     document_symbol: Some(lsp::DocumentSymbolClientCapabilities {
                         dynamic_registration: Some(false),
@@ -1198,6 +1260,42 @@ impl Client {
         };
 
         Some(self.call::<lsp::request::DocumentColor>(params))
+    }
+
+    /// The legend the server uses to encode token types and modifiers, if it supports full
+    /// document semantic token requests.
+    pub fn semantic_tokens_legend(&self) -> Option<&lsp::SemanticTokensLegend> {
+        let options = match self.capabilities().semantic_tokens_provider.as_ref()? {
+            lsp::SemanticTokensServerCapabilities::SemanticTokensOptions(options) => options,
+            lsp::SemanticTokensServerCapabilities::SemanticTokensRegistrationOptions(options) => {
+                &options.semantic_tokens_options
+            }
+        };
+
+        match options.full {
+            Some(
+                lsp::SemanticTokensFullOptions::Bool(true)
+                | lsp::SemanticTokensFullOptions::Delta { .. },
+            ) => Some(&options.legend),
+            _ => None,
+        }
+    }
+
+    pub fn text_document_semantic_tokens_full(
+        &self,
+        text_document: lsp::TextDocumentIdentifier,
+    ) -> Option<impl Future<Output = Result<Option<lsp::SemanticTokensResult>>>> {
+        if !self.supports_feature(LanguageServerFeature::SemanticTokens) {
+            return None;
+        }
+
+        let params = lsp::SemanticTokensParams {
+            text_document,
+            work_done_progress_params: lsp::WorkDoneProgressParams::default(),
+            partial_result_params: lsp::PartialResultParams::default(),
+        };
+
+        Some(self.call::<lsp::request::SemanticTokensFullRequest>(params))
     }
 
     pub fn text_document_document_link(

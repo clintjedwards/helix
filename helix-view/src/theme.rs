@@ -268,9 +268,14 @@ impl Loader {
             })
     }
 
+    /// The theme used when the config doesn't name one. Eastwood ships in the runtime
+    /// directory, so fall back to the built-in default if it's missing or broken.
     pub fn default_theme(&self, true_color: bool) -> Theme {
         if true_color {
-            self.default()
+            self.load("eastwood").unwrap_or_else(|err| {
+                warn!("failed to load default theme `eastwood` - {err}");
+                self.default()
+            })
         } else {
             self.base16_default()
         }

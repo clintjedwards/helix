@@ -276,6 +276,15 @@ async fn test_multi_selection_shell_commands() -> anyhow::Result<()> {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_undo_redo() -> anyhow::Result<()> {
+    // Ctrl-s writes by default now, so put save_selection back on it for these cases.
+    let app = || -> anyhow::Result<AppBuilder> {
+        let raw: helix_term::config::ConfigRaw =
+            toml::from_str("[keys.normal]\nC-s = \"save_selection\"")?;
+        let mut config = test_config();
+        config.keys = raw.keys.expect("test keys toml must define [keys]");
+        Ok(AppBuilder::new().with_config(config))
+    };
+
     // A jumplist selection is created at a point which is undone.
     //
     // * 2[<space>   Add two newlines at line start. We're now on line 3.
@@ -283,12 +292,15 @@ async fn test_undo_redo() -> anyhow::Result<()> {
     // * u           Undo the two newlines. We're now on line 1.
     // * <C-o><C-i>  Jump forward an back again in the jumplist. This would panic
     //               if the jumplist were not being updated correctly.
-    test((
-        "#[|]#",
-        "2[<space><C-s>u<C-o><C-i>",
-        "#[|]#",
-        LineFeedHandling::AsIs,
-    ))
+    test_with_config(
+        app()?,
+        (
+            "#[|]#",
+            "2[<space><C-s>u<C-o><C-i>",
+            "#[|]#",
+            LineFeedHandling::AsIs,
+        ),
+    )
     .await?;
 
     // A jumplist selection is passed through an edit and then an undo and then a redo.
@@ -300,12 +312,15 @@ async fn test_undo_redo() -> anyhow::Result<()> {
     // * <C-o>       Jump back in the jumplist. This would panic if the jumplist were not being
     //               updated correctly.
     // * <C-i>       Jump forward to line 1.
-    test((
-        "#[|]#",
-        "[<space><C-s>kduU<C-o><C-i>",
-        "#[|]#",
-        LineFeedHandling::AsIs,
-    ))
+    test_with_config(
+        app()?,
+        (
+            "#[|]#",
+            "[<space><C-s>kduU<C-o><C-i>",
+            "#[|]#",
+            LineFeedHandling::AsIs,
+        ),
+    )
     .await?;
 
     // In this case we 'redo' manually to ensure that the transactions are composing correctly.

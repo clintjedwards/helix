@@ -321,6 +321,7 @@ pub enum LanguageServerFeature {
     InlayHints,
     DocumentColors,
     CallHierarchy,
+    SemanticTokens,
 }
 
 impl Display for LanguageServerFeature {
@@ -348,6 +349,7 @@ impl Display for LanguageServerFeature {
             InlayHints => "inlay-hints",
             DocumentColors => "document-colors",
             CallHierarchy => "call-hierarchy",
+            SemanticTokens => "semantic-tokens",
         };
         write!(f, "{feature}",)
     }

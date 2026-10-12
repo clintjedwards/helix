@@ -223,7 +223,7 @@ pub fn default() -> HashMap<Mode, KeyTrie> {
 
         "C-i" | "tab" => jump_forward, // tab == <C-i>
         "C-o" => jump_backward,
-        "C-s" => save_selection,
+        "C-s" => write_buffer,
 
         "space" => { "Space"
             "f" => file_picker,
@@ -387,7 +387,7 @@ pub fn default() -> HashMap<Mode, KeyTrie> {
     let insert = keymap!({ "Insert mode"
         "esc" => normal_mode,
 
-        "C-s" => commit_undo_checkpoint,
+        "C-s" => write_buffer,
         "C-x" => completion,
         "C-r" => insert_register,
 

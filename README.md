@@ -201,6 +201,47 @@ C-space = [":toggle lsp.display-inlay-hints", ":toggle rainbow-brackets", ":togg
 
 </details>
 
+<details>
+<summary><strong>LSP semantic tokens</strong> — language server aware highlighting on top of tree-sitter</summary>
+
+<br>
+
+Tree-sitter only sees syntax, so it has to guess what an identifier is from how it's written. The language server actually knows. With semantic tokens on, a closure stored in a variable is colored as a variable even when you call it, and an enum is told apart from a module.
+
+Tokens are layered over tree-sitter highlights instead of replacing them. Only identifiers get server colors (types, functions, variables, parameters, constants and so on); keywords, strings, comments and operators stay with tree-sitter, which usually has finer scopes for them anyway. Server types map onto the regular theme scopes, so existing themes work without changes.
+
+It's on by default. To turn it off:
+
+```toml
+[editor.lsp]
+display-semantic-tokens = false
+```
+
+To turn it off for a single server, add `semantic-tokens` to that server's `except-features` in `languages.toml`.
+
+</details>
+
+<details>
+<summary><strong>Different defaults</strong> — settings that differ from upstream out of the box</summary>
+
+<br>
+
+- Theme is `eastwood` (falls back to `base16_default` without true color)
+- Indent falls back to 4 spaces instead of tabs. Language config, `.editorconfig` and detection from the file still win, so Go keeps tabs.
+- Trailing whitespace and extra final newlines are trimmed on write
+- Auto-save when the terminal loses focus
+- Auto-reload files changed on disk, prompting first if the buffer has unsaved edits
+- Bar cursor in insert mode
+- Mode indicator is colored per mode
+- Git branch shown in the statusline
+- `Ctrl-s` writes the buffer in normal, select and insert mode. It used to be `save_selection` in normal mode and `commit_undo_checkpoint` in insert; both are still available to rebind.
+- rust-analyzer runs clippy instead of `cargo check`
+- gopls sends semantic tokens
+
+Any of these can be set back in your own config.
+
+</details>
+
 # Installation
 
 [Installation documentation](https://docs.helix-editor.com/install.html).

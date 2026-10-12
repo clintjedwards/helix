@@ -301,7 +301,7 @@ impl Default for ExplorerConfig {
 #[serde(rename_all = "kebab-case", default, deny_unknown_fields)]
 pub struct AutoReloadConfig {
     /// Automatically reload documents when files change on disk.
-    /// Linux only. Defaults to false.
+    /// Linux only. Defaults to true.
     pub enable: bool,
     /// Show a prompt before reloading a document with unsaved changes.
     /// Defaults to true.
@@ -311,7 +311,7 @@ pub struct AutoReloadConfig {
 impl Default for AutoReloadConfig {
     fn default() -> Self {
         Self {
-            enable: false,
+            enable: true,
             prompt_if_modified: true,
         }
     }
@@ -628,6 +628,8 @@ pub struct LspConfig {
     pub inlay_hints_length_limit: Option<NonZeroU8>,
     /// Display document color swatches
     pub display_color_swatches: bool,
+    /// Layer LSP semantic tokens on top of tree-sitter highlights
+    pub display_semantic_tokens: bool,
     /// Whether to enable snippet support
     pub snippets: bool,
     /// Whether to include declaration in the goto reference query
@@ -648,6 +650,7 @@ impl Default for LspConfig {
             snippets: true,
             goto_reference_include_declaration: true,
             display_color_swatches: true,
+            display_semantic_tokens: true,
         }
     }
 }
@@ -681,6 +684,7 @@ impl Default for StatusLineConfig {
             left: vec![
                 E::Mode,
                 E::Spinner,
+                E::VersionControl,
                 E::FileName,
                 E::ReadOnlyIndicator,
                 E::FileModificationIndicator,
@@ -809,7 +813,14 @@ impl<'de> Deserialize<'de> for CursorShapeConfig {
         D: Deserializer<'de>,
     {
         let m = HashMap::<Mode, CursorKind>::deserialize(deserializer)?;
-        let into_cursor = |mode: Mode| m.get(&mode).copied().unwrap_or_default();
+        // Modes left out of the config keep their default shape rather than all
+        // falling back to a block.
+        let defaults = CursorShapeConfig::default();
+        let into_cursor = |mode: Mode| {
+            m.get(&mode)
+                .copied()
+                .unwrap_or_else(|| defaults.from_mode(mode))
+        };
         Ok(CursorShapeConfig([
             into_cursor(Mode::Normal),
             into_cursor(Mode::Select),
@@ -842,7 +853,8 @@ impl std::ops::Deref for CursorShapeConfig {
 
 impl Default for CursorShapeConfig {
     fn default() -> Self {
-        Self([CursorKind::Block; 3])
+        // Indexed by `Mode`: normal, select, insert.
+        Self([CursorKind::Block, CursorKind::Block, CursorKind::Bar])
     }
 }
 
@@ -993,15 +1005,28 @@ impl WhitespaceRender {
     }
 }
 
-#[derive(Debug, Default, Clone, PartialEq, Eq, Deserialize, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct AutoSave {
     /// Auto save after a delay in milliseconds. Defaults to disabled.
     #[serde(default)]
     pub after_delay: AutoSaveAfterDelay,
-    /// Auto save on focus lost. Defaults to false.
-    #[serde(default)]
+    /// Auto save on focus lost. Defaults to true.
+    #[serde(default = "default_auto_save_focus_lost")]
     pub focus_lost: bool,
+}
+
+impl Default for AutoSave {
+    fn default() -> Self {
+        Self {
+            after_delay: AutoSaveAfterDelay::default(),
+            focus_lost: default_auto_save_focus_lost(),
+        }
+    }
+}
+
+fn default_auto_save_focus_lost() -> bool {
+    true
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
@@ -1198,7 +1223,7 @@ impl Default for Config {
             whitespace: WhitespaceConfig::default(),
             bufferline: BufferLine::default(),
             indent_guides: IndentGuidesConfig::default(),
-            color_modes: false,
+            color_modes: true,
             soft_wrap: SoftWrap {
                 enable: Some(false),
                 ..SoftWrap::default()
@@ -1210,8 +1235,8 @@ impl Default for Config {
             default_line_ending: LineEndingConfig::default(),
             insert_final_newline: true,
             atomic_save: true,
-            trim_final_newlines: false,
-            trim_trailing_whitespace: false,
+            trim_final_newlines: true,
+            trim_trailing_whitespace: true,
             smart_tab: Some(SmartTabConfig::default()),
             popup_border: PopupBorderConfig::None,
             indent_heuristic: IndentationHeuristic::default(),
@@ -1226,7 +1251,7 @@ impl Default for Config {
             insecure: false,
             auto_reload: AutoReloadConfig::default(),
             tab_width: None,
-            indent_style: None,
+            indent_style: Some(DefaultIndentStyle::Spaces),
         }
     }
 }

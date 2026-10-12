@@ -63,7 +63,7 @@ Normal mode is the default mode when you launch helix. You can return to it from
 | `Ctrl-d`              | Move cursor and page half page down                | `page_cursor_half_down`     |
 | `Ctrl-i`              | Jump forward on the jumplist                       | `jump_forward`              |
 | `Ctrl-o`              | Jump backward on the jumplist                      | `jump_backward`             |
-| `Ctrl-s`              | Save the current selection to the jumplist         | `save_selection`            |
+| `Ctrl-s`              | Write changes to disk                              | `write_buffer`              |
 
 ### Changes
 
@@ -400,7 +400,7 @@ escaping from insert mode to normal mode.
 | Key                                         | Description                 | Command                  |
 | -----                                       | -----------                 | -------                  |
 | `Escape`                                    | Switch to normal mode       | `normal_mode`            |
-| `Ctrl-s`                                    | Commit undo checkpoint      | `commit_undo_checkpoint` |
+| `Ctrl-s`                                    | Write changes to disk       | `write_buffer`           |
 | `Ctrl-x`                                    | Autocomplete                | `completion`             |
 | `Ctrl-r`                                    | Insert a register content   | `insert_register`        |
 | `Ctrl-w`, `Alt-Backspace`                   | Delete previous word        | `delete_word_backward`   |

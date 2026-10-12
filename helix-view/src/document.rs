@@ -213,6 +213,8 @@ pub struct Document {
     pub color_swatches: Option<DocumentColorSwatches>,
     /// Cached LSP document links for navigation (e.g. goto_file).
     pub document_links: Vec<DocumentLink>,
+    /// LSP semantic tokens, sorted by position and non-overlapping.
+    pub semantic_tokens: Vec<SemanticToken>,
     // NOTE: ideally this would live on the handler for color swatches. This is blocked on a
     // large refactor that would make `&mut Editor` available on the `DocumentDidChange` event.
     pub color_swatch_controller: TaskController,
@@ -220,6 +222,7 @@ pub struct Document {
     pub document_highlight_controllers: HashMap<ViewId, TaskController>,
     pub pull_diagnostic_controller: TaskController,
     pub document_link_controller: TaskController,
+    pub semantic_tokens_controller: TaskController,
 
     // NOTE: this field should eventually go away - we should use the Editor's syn_loader instead
     // of storing a copy on every doc. Then we can remove the surrounding `Arc` and use the
@@ -232,6 +235,17 @@ pub struct DocumentColorSwatches {
     pub color_swatches: Vec<InlineAnnotation>,
     pub colors: Vec<syntax::Highlight>,
     pub color_swatches_padding: Vec<InlineAnnotation>,
+}
+
+/// A span of text the language server classified, already mapped to a theme scope.
+///
+/// We keep the scope name rather than a resolved `Highlight` so tokens stay valid when the
+/// theme changes.
+#[derive(Debug, Clone)]
+pub struct SemanticToken {
+    pub start: usize,
+    pub end: usize,
+    pub scope: &'static str,
 }
 
 /// Highlight ranges returned by LSP `textDocument/documentHighlight` for a view.
@@ -764,6 +778,8 @@ impl Document {
             previous_diagnostic_ids: HashMap::new(),
             pull_diagnostic_controller: TaskController::new(),
             document_link_controller: TaskController::new(),
+            semantic_tokens: Vec::new(),
+            semantic_tokens_controller: TaskController::new(),
         }
     }
 

@@ -68,6 +68,8 @@ impl Context<'_> {
         let (sig_tx, _sig_rx) = mpsc::channel(1);
         let (auto_save_tx, _auto_save_rx) = mpsc::channel(1);
         let (doc_colors_tx, _doc_colors_rx) = mpsc::channel(1);
+        let (doc_links_tx, _doc_links_rx) = mpsc::channel(1);
+        let (semantic_tokens_tx, _semantic_tokens_rx) = mpsc::channel(1);
         let (pull_diag_tx, _pull_diag_rx) = mpsc::channel(1);
         let (pull_all_diag_tx, _pull_all_diag_rx) = mpsc::channel(1);
 
@@ -76,6 +78,8 @@ impl Context<'_> {
             signature_hints: sig_tx,
             auto_save: auto_save_tx,
             document_colors: doc_colors_tx,
+            document_links: doc_links_tx,
+            semantic_tokens: semantic_tokens_tx,
             word_index: helix_view::handlers::word_index::Handler::spawn(),
             pull_diagnostics: pull_diag_tx,
             pull_all_documents_diagnostics: pull_all_diag_tx,

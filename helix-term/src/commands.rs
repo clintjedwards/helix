@@ -541,6 +541,7 @@ impl MappableCommand {
         jump_forward, "Jump forward on jumplist",
         jump_backward, "Jump backward on jumplist",
         save_selection, "Save current selection to jumplist",
+        write_buffer, "Write changes to disk",
         jump_view_right, "Jump to right split",
         jump_view_left, "Jump to left split",
         jump_view_up, "Jump to split above",
@@ -6026,6 +6027,17 @@ fn save_selection(cx: &mut Context) {
     let (view, doc) = current!(cx.editor);
     push_jump(view, doc);
     cx.editor.set_status("Selection saved to jumplist");
+}
+
+fn write_buffer(cx: &mut Context) {
+    // Same as `:write`, which also commits pending insert mode edits so the buffer
+    // doesn't read as modified again after leaving insert mode.
+    MappableCommand::Typable {
+        name: "write".to_string(),
+        args: String::new(),
+        doc: String::new(),
+    }
+    .execute(cx);
 }
 
 fn rotate_view(cx: &mut Context) {

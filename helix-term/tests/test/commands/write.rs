@@ -570,6 +570,8 @@ async fn test_write_trim_final_newlines() -> anyhow::Result<()> {
         .with_config(Config {
             editor: helix_view::editor::Config {
                 trim_final_newlines: true,
+                // Only testing final newlines here; keep the whitespace-only line intact.
+                trim_trailing_whitespace: false,
                 ..Default::default()
             },
             ..Default::default()
@@ -581,6 +583,30 @@ async fn test_write_trim_final_newlines() -> anyhow::Result<()> {
     test_key_sequence(&mut app, Some(":w<ret>"), None, false).await?;
 
     helpers::assert_file_has_content(&mut file, &LineFeedHandling::Native.apply("foo\n \n"))?;
+
+    Ok(())
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_write_buffer_from_insert_mode() -> anyhow::Result<()> {
+    let mut file = tempfile::NamedTempFile::new()?;
+    let mut app = helpers::AppBuilder::new()
+        .with_file(file.path(), None)
+        .build()?;
+
+    // Leaving insert mode after the write must not mark the document as modified again.
+    test_key_sequence(
+        &mut app,
+        Some("ihello<C-s><esc>"),
+        Some(&|app| {
+            let doc = doc!(app.editor);
+            assert!(!doc.is_modified());
+        }),
+        false,
+    )
+    .await?;
+
+    helpers::assert_file_has_content(&mut file, &LineFeedHandling::Native.apply("hello\n"))?;
 
     Ok(())
 }

@@ -1199,6 +1199,26 @@ impl Application {
 
                         Ok(serde_json::Value::Null)
                     }
+                    Ok(MethodCall::SemanticTokensRefresh) => {
+                        let language_server = language_server!().id();
+
+                        let documents: Vec<_> = self
+                            .editor
+                            .documents
+                            .values()
+                            .filter(|x| x.supports_language_server(language_server))
+                            .map(|x| x.id())
+                            .collect();
+
+                        for document in documents {
+                            handlers::semantic_tokens::request_semantic_tokens(
+                                &mut self.editor,
+                                document,
+                            );
+                        }
+
+                        Ok(serde_json::Value::Null)
+                    }
                     Ok(MethodCall::ShowMessageRequest(params)) => {
                         if let Some(actions) = params.actions.filter(|a| !a.is_empty()) {
                             let id = id.clone();

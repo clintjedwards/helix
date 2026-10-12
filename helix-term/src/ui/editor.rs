@@ -17,7 +17,7 @@ use helix_core::{
     diagnostic::NumberOrString,
     graphemes::{next_grapheme_boundary, prev_grapheme_boundary},
     movement::Direction,
-    syntax::{self, OverlayHighlights},
+    syntax::{self, Highlight, OverlayHighlights},
     text_annotations::TextAnnotations,
     unicode::width::UnicodeWidthStr,
     visual_offset_from_block, Change, Position, Range, Selection, Transaction,
@@ -128,6 +128,14 @@ impl EditorView {
             inner.height,
             &text_annotations,
         ));
+
+        if config.lsp.display_semantic_tokens {
+            if let Some(overlay) =
+                Self::doc_semantic_token_highlights(doc, view_offset.anchor, inner.height, theme)
+            {
+                overlays.push(overlay);
+            }
+        }
 
         if doc
             .language_config()
@@ -325,6 +333,55 @@ impl EditorView {
         range = text.byte_to_char(range.start)..text.byte_to_char(range.end);
 
         text_annotations.collect_overlay_highlights(range)
+    }
+
+    /// Get highlight spans for LSP semantic tokens within the viewport.
+    pub fn doc_semantic_token_highlights(
+        doc: &Document,
+        anchor: usize,
+        height: u16,
+        theme: &Theme,
+    ) -> Option<OverlayHighlights> {
+        if doc.semantic_tokens.is_empty() {
+            return None;
+        }
+
+        let text = doc.text().slice(..);
+        let row = text.char_to_line(anchor.min(text.len_chars()));
+        let range = Self::viewport_byte_range(text, row, height);
+        let range = text.byte_to_char(range.start)..text.byte_to_char(range.end);
+
+        let first = doc
+            .semantic_tokens
+            .partition_point(|token| token.end <= range.start);
+
+        // A file only uses a handful of distinct scopes, so cache the theme lookups.
+        let mut resolved: Vec<(&'static str, Option<Highlight>)> = Vec::new();
+        let mut highlights = Vec::new();
+        for token in &doc.semantic_tokens[first..] {
+            if token.start >= range.end {
+                break;
+            }
+            // Edits can collapse a token to nothing before the refreshed set arrives.
+            if token.start >= token.end {
+                continue;
+            }
+
+            let highlight = match resolved.iter().find(|(scope, _)| *scope == token.scope) {
+                Some((_, highlight)) => *highlight,
+                None => {
+                    let highlight = theme.find_highlight(token.scope);
+                    resolved.push((token.scope, highlight));
+                    highlight
+                }
+            };
+
+            if let Some(highlight) = highlight {
+                highlights.push((highlight, token.start..token.end));
+            }
+        }
+
+        Some(OverlayHighlights::Heterogenous { highlights })
     }
 
     pub fn doc_rainbow_highlights(
