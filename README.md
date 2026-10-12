@@ -45,7 +45,10 @@ Note: Only certain languages have indentation definitions at the moment. Check
 
 # Fork additions
 
-This is my personal fork of helix adding to the base codebase the things I personally need and use. Click any feature below to expand its documentation.
+This is my personal fork of helix adding to the base codebase the things I personally need and use, along with my
+preferred defaults.
+
+Click any feature below to expand its documentation.
 
 <details>
 <summary><strong>LSP status picker</strong> — view and restart language servers (<code>:lsp-info</code>)</summary>
