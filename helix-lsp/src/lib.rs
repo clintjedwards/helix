@@ -86,7 +86,9 @@ pub enum LspServerStatus {
     Running,
     /// Server was manually stopped via `:lsp-stop` (tombstone present in registry).
     Stopped,
-    /// Server is not in the registry — either never started, or exited/crashed.
+    /// Server crashed or couldn't be started, and nothing has replaced it yet.
+    Failed,
+    /// Server is not in the registry and was never started.
     NotStarted,
 }
 
@@ -98,6 +100,27 @@ pub struct LspServerInfo {
     pub root_path: Option<PathBuf>,
     pub pid: Option<u32>,
     pub offset_encoding: Option<OffsetEncoding>,
+    /// One line summary of the last failure, if the server has failed since it last
+    /// initialized successfully.
+    pub error: Option<String>,
+}
+
+/// Why a language server stopped working. We keep these around so the editor can show
+/// them instead of the failure only ending up in the log.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LanguageServerFailure {
+    pub reason: String,
+    /// The last lines the server wrote to stderr. This is usually where the real
+    /// explanation is, and often the fix too (rustup, for example, prints the
+    /// command to install a missing component).
+    pub stderr: Vec<String>,
+}
+
+impl LanguageServerFailure {
+    /// A one line summary for places that don't have room for the whole stderr tail.
+    pub fn summary(&self) -> &str {
+        self.stderr.last().unwrap_or(&self.reason)
+    }
 }
 
 pub mod util {
@@ -600,6 +623,9 @@ pub struct Registry {
     syn_loader: Arc<ArcSwap<helix_core::syntax::Loader>>,
     pub incoming: SelectAll<UnboundedReceiverStream<(LanguageServerId, Call)>>,
     pub file_event_handler: file_event::Handler,
+    /// Last failure per server. Cleared once the server initializes successfully or the
+    /// user restarts or stops it.
+    failures: HashMap<LanguageServerName, LanguageServerFailure>,
 }
 
 impl Registry {
@@ -610,6 +636,41 @@ impl Registry {
             syn_loader,
             incoming: SelectAll::new(),
             file_event_handler: file_event::Handler::new(),
+            failures: HashMap::new(),
+        }
+    }
+
+    /// Records a failure for `name`. Returns false if it's identical to the failure we
+    /// already had, so callers can avoid nagging the user when a server keeps dying the
+    /// same way every time a file is opened.
+    pub fn record_failure(&mut self, name: &str, failure: LanguageServerFailure) -> bool {
+        log::error!(
+            "language server '{name}' {}: {:?}",
+            failure.reason,
+            failure.stderr
+        );
+        self.failures.insert(name.to_owned(), failure.clone()) != Some(failure)
+    }
+
+    pub fn clear_failure(&mut self, name: &str) {
+        self.failures.remove(name);
+    }
+
+    pub fn failure(&self, name: &str) -> Option<&LanguageServerFailure> {
+        self.failures.get(name)
+    }
+
+    /// Startup errors would otherwise only reach the log. A missing executable is the
+    /// exception; plenty of languages list servers that most people never install.
+    fn record_startup_failure(&mut self, name: &str, err: &Error) {
+        if !matches!(err, Error::ExecutableNotFound(_)) {
+            self.record_failure(
+                name,
+                LanguageServerFailure {
+                    reason: format!("failed to start: {err}"),
+                    stderr: Vec::new(),
+                },
+            );
         }
     }
 
@@ -674,6 +735,9 @@ impl Registry {
         root_dirs: &[PathBuf],
         enable_snippets: bool,
     ) -> Option<Result<Arc<Client>>> {
+        // An explicit restart is a fresh attempt, so if it fails again the user should hear
+        // about it again.
+        self.failures.remove(name);
         if let Some(old_clients) = self.inner_by_name.remove(name) {
             if old_clients.is_empty() {
                 log::info!("restarting client for '{name}' which was manually stopped");
@@ -697,7 +761,10 @@ impl Registry {
         ) {
             Ok(client) => client,
             Err(StartupError::NoRequiredRootFound) => return None,
-            Err(StartupError::Error(err)) => return Some(Err(err)),
+            Err(StartupError::Error(err)) => {
+                self.record_startup_failure(name, &err);
+                return Some(Err(err));
+            }
         };
         self.inner_by_name
             .insert(name.to_owned(), vec![client.clone()]);
@@ -706,6 +773,7 @@ impl Registry {
     }
 
     pub fn stop(&mut self, name: &str) {
+        self.failures.remove(name);
         if let Some(clients) = self.inner_by_name.get_mut(name) {
             // Drain the clients vec so that the entry in `inner_by_name` remains
             // empty. We use the empty vec as a "tombstone" to mean that a server
@@ -765,7 +833,10 @@ impl Registry {
                         Some((name.clone(), Ok(client)))
                     }
                     Err(StartupError::NoRequiredRootFound) => None,
-                    Err(StartupError::Error(err)) => Some((name.to_owned(), Err(err))),
+                    Err(StartupError::Error(err)) => {
+                        self.record_startup_failure(name, &err);
+                        Some((name.to_owned(), Err(err)))
+                    }
                 }
             },
         )
@@ -787,13 +858,19 @@ impl Registry {
             .iter()
             .map(|ls| {
                 let name = &ls.name;
+                let error = self.failures.get(name).map(|f| f.summary().to_owned());
                 match self.inner_by_name.get(name) {
                     None => LspServerInfo {
                         name: name.clone(),
-                        status: LspServerStatus::NotStarted,
+                        status: if error.is_some() {
+                            LspServerStatus::Failed
+                        } else {
+                            LspServerStatus::NotStarted
+                        },
                         root_path: None,
                         pid: None,
                         offset_encoding: None,
+                        error,
                     },
                     Some(clients) if clients.is_empty() => LspServerInfo {
                         name: name.clone(),
@@ -801,6 +878,7 @@ impl Registry {
                         root_path: None,
                         pid: None,
                         offset_encoding: None,
+                        error,
                     },
                     Some(clients) => {
                         let client = &clients[0];
@@ -819,6 +897,7 @@ impl Registry {
                             } else {
                                 None
                             },
+                            error,
                         }
                     }
                 }

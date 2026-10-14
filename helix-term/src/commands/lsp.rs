@@ -1477,14 +1477,13 @@ pub fn lsp_info(cx: &mut Context) {
     }
 
     let columns = [
-        ui::PickerColumn::new("name", |item: &LspServerInfo, _| {
-            item.name.as_str().into()
-        }),
+        ui::PickerColumn::new("name", |item: &LspServerInfo, _| item.name.as_str().into()),
         ui::PickerColumn::new("status", |item: &LspServerInfo, _| {
             match item.status {
                 LspServerStatus::Initializing => "initializing",
                 LspServerStatus::Running => "running",
                 LspServerStatus::Stopped => "stopped",
+                LspServerStatus::Failed => "failed",
                 LspServerStatus::NotStarted => "not started",
             }
             .into()
@@ -1501,10 +1500,7 @@ pub fn lsp_info(cx: &mut Context) {
                 .unwrap_or_default()
         }),
         ui::PickerColumn::new("pid", |item: &LspServerInfo, _| {
-            item.pid
-                .map(|p| p.to_string())
-                .unwrap_or_default()
-                .into()
+            item.pid.map(|p| p.to_string()).unwrap_or_default().into()
         }),
         ui::PickerColumn::new("encoding", |item: &LspServerInfo, _| {
             match item.offset_encoding {
@@ -1514,6 +1510,9 @@ pub fn lsp_info(cx: &mut Context) {
                 None => "",
             }
             .into()
+        }),
+        ui::PickerColumn::new("error", |item: &LspServerInfo, _| {
+            item.error.as_deref().unwrap_or_default().to_owned().into()
         }),
     ];
 
@@ -1546,9 +1545,7 @@ pub fn lsp_info(cx: &mut Context) {
                 ));
                 return;
             }
-            Some(Ok(_)) => cx
-                .editor
-                .set_status(format!("Restarting '{}'", item.name)),
+            Some(Ok(_)) => cx.editor.set_status(format!("Restarting '{}'", item.name)),
         }
 
         let name = item.name.clone();

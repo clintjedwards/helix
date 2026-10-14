@@ -873,6 +873,7 @@ impl Application {
                 match notification {
                     Notification::Initialized => {
                         let language_server = language_server!();
+                        let name = language_server.name().to_owned();
 
                         // Trigger a workspace/didChangeConfiguration notification after initialization.
                         // This might not be required by the spec but Neovim does this as well, so it's
@@ -880,6 +881,9 @@ impl Application {
                         if let Some(config) = language_server.config() {
                             language_server.did_change_configuration(config.clone());
                         }
+
+                        // The server came up fine, so any earlier crash no longer applies.
+                        self.editor.language_servers.clear_failure(&name);
 
                         helix_event::dispatch(helix_view::events::LanguageServerInitialized {
                             editor: &mut self.editor,
@@ -1000,7 +1004,19 @@ impl Application {
                         // do nothing
                     }
                     Notification::Exit => {
-                        self.editor.set_status("Language server exited");
+                        // `:lsp-stop` and `:lsp-restart` pull the client out of the registry
+                        // before shutting it down, so if it's still registered it died on its own.
+                        match self.editor.language_servers.get_by_id(server_id) {
+                            Some(client) => {
+                                let name = client.name().to_owned();
+                                let failure = helix_lsp::LanguageServerFailure {
+                                    reason: "exited unexpectedly".to_string(),
+                                    stderr: client.stderr_tail(),
+                                };
+                                self.handle_language_server_failure(name, failure);
+                            }
+                            None => self.editor.set_status("Language server exited"),
+                        }
 
                         // LSPs may produce diagnostics for files that haven't been opened in helix,
                         // we need to clear those and remove the entries from the list if this leads to
@@ -1277,6 +1293,35 @@ impl Application {
                 _ => self.editor.set_status(message),
             }
         }
+    }
+
+    /// Lets the user know a language server stopped working. The status message is always
+    /// set, but the notice with the server's stderr is only shown the first time a server
+    /// fails a particular way, so a server that dies on every file open doesn't keep
+    /// interrupting.
+    fn handle_language_server_failure(
+        &mut self,
+        name: String,
+        failure: helix_lsp::LanguageServerFailure,
+    ) {
+        use ui::lsp::failure::LspFailureNotice;
+
+        self.editor.set_error(format!(
+            "{name} {}, run :lsp-info for details",
+            failure.reason
+        ));
+        if !self
+            .editor
+            .language_servers
+            .record_failure(&name, failure.clone())
+        {
+            return;
+        }
+
+        self.compositor.replace_or_push(
+            LspFailureNotice::ID,
+            LspFailureNotice::new(name, &failure),
+        );
     }
 
     fn handle_show_document(

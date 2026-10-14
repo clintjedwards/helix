@@ -691,6 +691,7 @@ impl Default for StatusLineConfig {
             ],
             center: vec![],
             right: vec![
+                E::LspHealth,
                 E::Diagnostics,
                 E::Selections,
                 E::Register,
@@ -794,6 +795,9 @@ pub enum StatusLineElement {
 
     /// The base of current working directory
     CurrentWorkingDirectory,
+
+    /// Names any language server for the current file that crashed or failed to start
+    LspHealth,
 }
 
 // Cursor shape is read and used on every rendered frame and so needs
@@ -1801,6 +1805,12 @@ impl Editor {
                                 lang,
                                 err
                             );
+                            // Assigned directly instead of through `set_error` since `doc`
+                            // still borrows the editor here.
+                            self.status_msg = Some((
+                                format!("{lang} failed to start: {err}").into(),
+                                Severity::Error,
+                            ));
                         }
                         None
                     }

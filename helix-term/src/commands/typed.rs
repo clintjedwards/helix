@@ -1851,110 +1851,92 @@ fn lsp_info_command(
         let call: job::Callback = Callback::EditorCompositor(Box::new(
             move |_editor: &mut Editor, compositor: &mut Compositor| {
                 let columns = [
-                    ui::PickerColumn::new(
-                        "name",
-                        |item: &helix_lsp::LspServerInfo, _| item.name.as_str().into(),
-                    ),
-                    ui::PickerColumn::new(
-                        "status",
-                        |item: &helix_lsp::LspServerInfo, _| {
-                            match item.status {
-                                helix_lsp::LspServerStatus::Initializing => "initializing",
-                                helix_lsp::LspServerStatus::Running => "running",
-                                helix_lsp::LspServerStatus::Stopped => "stopped",
-                                helix_lsp::LspServerStatus::NotStarted => "not started",
-                            }
-                            .into()
-                        },
-                    ),
-                    ui::PickerColumn::new(
-                        "root",
-                        |item: &helix_lsp::LspServerInfo, _| {
-                            item.root_path
-                                .as_deref()
-                                .map(|p| {
-                                    helix_stdx::path::get_truncated_path(p)
-                                        .to_string_lossy()
-                                        .into_owned()
-                                        .into()
-                                })
-                                .unwrap_or_default()
-                        },
-                    ),
-                    ui::PickerColumn::new("pid", |item: &helix_lsp::LspServerInfo, _| {
-                        item.pid
-                            .map(|p| p.to_string())
-                            .unwrap_or_default()
-                            .into()
+                    ui::PickerColumn::new("name", |item: &helix_lsp::LspServerInfo, _| {
+                        item.name.as_str().into()
                     }),
-                    ui::PickerColumn::new(
-                        "encoding",
-                        |item: &helix_lsp::LspServerInfo, _| {
-                            match item.offset_encoding {
-                                Some(helix_lsp::OffsetEncoding::Utf8) => "UTF-8",
-                                Some(helix_lsp::OffsetEncoding::Utf16) => "UTF-16",
-                                Some(helix_lsp::OffsetEncoding::Utf32) => "UTF-32",
-                                None => "",
-                            }
-                            .into()
-                        },
-                    ),
-                ];
-                let picker = ui::Picker::new(
-                    columns,
-                    0,
-                    items,
-                    (),
-                    move |cx, item, _action| {
-                        let language = doc!(cx.editor).language.clone();
-                        let doc_path = doc!(cx.editor).path().cloned();
-                        let workspace_lsp_roots =
-                            cx.editor.config.load().workspace_lsp_roots.clone();
-                        let snippets = cx.editor.config.load().lsp.snippets;
-
-                        let Some(language_config) = language else {
-                            return;
-                        };
-
-                        match cx.editor.language_servers.restart_server(
-                            &item.name,
-                            &language_config,
-                            doc_path.as_ref(),
-                            &workspace_lsp_roots,
-                            snippets,
-                        ) {
-                            Some(Err(err)) => {
-                                cx.editor.set_error(err.to_string());
-                                return;
-                            }
-                            None => {
-                                cx.editor.set_status(format!(
-                                    "'{}' not started (no suitable workspace root found)",
-                                    item.name
-                                ));
-                                return;
-                            }
-                            Some(Ok(_)) => cx
-                                .editor
-                                .set_status(format!("Restarting '{}'", item.name)),
+                    ui::PickerColumn::new("status", |item: &helix_lsp::LspServerInfo, _| {
+                        match item.status {
+                            helix_lsp::LspServerStatus::Initializing => "initializing",
+                            helix_lsp::LspServerStatus::Running => "running",
+                            helix_lsp::LspServerStatus::Stopped => "stopped",
+                            helix_lsp::LspServerStatus::Failed => "failed",
+                            helix_lsp::LspServerStatus::NotStarted => "not started",
                         }
-
-                        let name = item.name.clone();
-                        let doc_ids: Vec<_> = cx
-                            .editor
-                            .documents()
-                            .filter(|doc| {
-                                doc.language_config().map_or(false, |cfg| {
-                                    cfg.language_servers.iter().any(|ls| ls.name == name)
-                                })
+                        .into()
+                    }),
+                    ui::PickerColumn::new("root", |item: &helix_lsp::LspServerInfo, _| {
+                        item.root_path
+                            .as_deref()
+                            .map(|p| {
+                                helix_stdx::path::get_truncated_path(p)
+                                    .to_string_lossy()
+                                    .into_owned()
+                                    .into()
                             })
-                            .map(|doc| doc.id())
-                            .collect();
-                        for id in doc_ids {
-                            cx.editor.refresh_language_servers(id);
+                            .unwrap_or_default()
+                    }),
+                    ui::PickerColumn::new("pid", |item: &helix_lsp::LspServerInfo, _| {
+                        item.pid.map(|p| p.to_string()).unwrap_or_default().into()
+                    }),
+                    ui::PickerColumn::new("encoding", |item: &helix_lsp::LspServerInfo, _| {
+                        match item.offset_encoding {
+                            Some(helix_lsp::OffsetEncoding::Utf8) => "UTF-8",
+                            Some(helix_lsp::OffsetEncoding::Utf16) => "UTF-16",
+                            Some(helix_lsp::OffsetEncoding::Utf32) => "UTF-32",
+                            None => "",
                         }
-                    },
-                );
+                        .into()
+                    }),
+                    ui::PickerColumn::new("error", |item: &helix_lsp::LspServerInfo, _| {
+                        item.error.as_deref().unwrap_or_default().to_owned().into()
+                    }),
+                ];
+                let picker = ui::Picker::new(columns, 0, items, (), move |cx, item, _action| {
+                    let language = doc!(cx.editor).language.clone();
+                    let doc_path = doc!(cx.editor).path().cloned();
+                    let workspace_lsp_roots = cx.editor.config.load().workspace_lsp_roots.clone();
+                    let snippets = cx.editor.config.load().lsp.snippets;
+
+                    let Some(language_config) = language else {
+                        return;
+                    };
+
+                    match cx.editor.language_servers.restart_server(
+                        &item.name,
+                        &language_config,
+                        doc_path.as_ref(),
+                        &workspace_lsp_roots,
+                        snippets,
+                    ) {
+                        Some(Err(err)) => {
+                            cx.editor.set_error(err.to_string());
+                            return;
+                        }
+                        None => {
+                            cx.editor.set_status(format!(
+                                "'{}' not started (no suitable workspace root found)",
+                                item.name
+                            ));
+                            return;
+                        }
+                        Some(Ok(_)) => cx.editor.set_status(format!("Restarting '{}'", item.name)),
+                    }
+
+                    let name = item.name.clone();
+                    let doc_ids: Vec<_> = cx
+                        .editor
+                        .documents()
+                        .filter(|doc| {
+                            doc.language_config().map_or(false, |cfg| {
+                                cfg.language_servers.iter().any(|ls| ls.name == name)
+                            })
+                        })
+                        .map(|doc| doc.id())
+                        .collect();
+                    for id in doc_ids {
+                        cx.editor.refresh_language_servers(id);
+                    }
+                });
                 compositor.push(Box::new(ui::overlay::overlaid(picker)))
             },
         ));

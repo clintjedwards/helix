@@ -7,8 +7,9 @@ use anyhow::Context;
 use log::{error, info};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::sync::Arc;
+use std::time::Duration;
 use tokio::{
     io::{AsyncBufRead, AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader, BufWriter},
     process::{ChildStderr, ChildStdin, ChildStdout},
@@ -39,11 +40,20 @@ enum ServerMessage {
     Call(jsonrpc::Call),
 }
 
+/// How many of the most recent stderr lines to keep around per server. When a server dies
+/// these are usually where the explanation is, so we hold onto enough to show the user.
+const STDERR_TAIL_LINES: usize = 20;
+
+/// Shared buffer holding the last [`STDERR_TAIL_LINES`] lines a server wrote to stderr.
+pub type StderrTail = Arc<parking_lot::Mutex<VecDeque<String>>>;
+
 #[derive(Debug)]
 pub struct Transport {
     id: LanguageServerId,
     name: String,
     pending_requests: Mutex<HashMap<jsonrpc::Id, Sender<Result<Value>>>>,
+    stderr_tail: StderrTail,
+    stderr_closed: Notify,
 }
 
 impl Transport {
@@ -53,6 +63,7 @@ impl Transport {
         server_stderr: BufReader<ChildStderr>,
         id: LanguageServerId,
         name: String,
+        stderr_tail: StderrTail,
     ) -> (
         UnboundedReceiver<(LanguageServerId, jsonrpc::Call)>,
         UnboundedSender<Payload>,
@@ -66,6 +77,8 @@ impl Transport {
             id,
             name,
             pending_requests: Mutex::new(HashMap::default()),
+            stderr_tail,
+            stderr_closed: Notify::new(),
         };
 
         let transport = Arc::new(transport);
@@ -298,6 +311,15 @@ impl Transport {
                         }
                     }
 
+                    // stdout and stderr are read by separate tasks, so a server that prints an
+                    // error and exits can close stdout before we've read its last stderr lines.
+                    // Give stderr a moment to drain so the exit handler sees the full story.
+                    let _ = tokio::time::timeout(
+                        Duration::from_millis(500),
+                        transport.stderr_closed.notified(),
+                    )
+                    .await;
+
                     // Hack: inject a terminated notification so we trigger code that needs to happen after exit
                     let notification =
                         ServerMessage::Call(jsonrpc::Call::Notification(jsonrpc::Notification {
@@ -326,9 +348,20 @@ impl Transport {
             match Self::recv_server_error(&mut server_stderr, &mut recv_buffer, &transport.name)
                 .await
             {
-                Ok(_) => {}
+                Ok(_) => {
+                    let line = recv_buffer.trim_end();
+                    if !line.is_empty() {
+                        let mut tail = transport.stderr_tail.lock();
+                        if tail.len() == STDERR_TAIL_LINES {
+                            tail.pop_front();
+                        }
+                        tail.push_back(line.to_string());
+                    }
+                }
                 Err(err) => {
                     error!("{} err: <- {err:?}", transport.name);
+                    // notify_one stores a permit, so this works even if `recv` isn't waiting yet.
+                    transport.stderr_closed.notify_one();
                     break;
                 }
             }

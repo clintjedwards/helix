@@ -55,7 +55,12 @@ Click any feature below to expand its documentation.
 
 <br>
 
-Run `:lsp-info` to open a picker showing all language servers for the current file — their status (initializing, running, stopped), root path, and PID. Pressing Enter on a server restarts it.
+Run `:lsp-info` to open a picker showing all language servers for the current file — their status (initializing, running, stopped, failed), root path, PID, and the last error if it crashed. Pressing Enter on a server restarts it.
+
+When a language server crashes or fails to start, you hear about it right away instead of finding out when hover stops working:
+
+- A box in the bottom right shows the last lines the server wrote to stderr. That's usually where the server explains itself, and often how to fix it (rustup, for example, tells you which toolchain or component to install). It stays up while you keep editing until you press Esc in normal mode, and goes away by itself once the server is working again. It only shows once per distinct failure, so a server that dies on every file open won't keep interrupting.
+- The `lsp-health` statusline element shows `● <server> failed` in red until the server comes back up, or you `:lsp-restart` or `:lsp-stop` it.
 
 </details>
 
@@ -237,6 +242,7 @@ To turn it off for a single server, add `semantic-tokens` to that server's `exce
 - Bar cursor in insert mode
 - Mode indicator is colored per mode
 - Git branch shown in the statusline
+- Crashed or failed language servers shown in the statusline (`lsp-health`)
 - `Ctrl-s` writes the buffer in normal, select and insert mode. It used to be `save_selection` in normal mode and `commit_undo_checkpoint` in insert; both are still available to rebind.
 - rust-analyzer runs clippy instead of `cargo check`
 - gopls sends semantic tokens

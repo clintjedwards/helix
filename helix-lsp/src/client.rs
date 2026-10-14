@@ -1,7 +1,7 @@
 use crate::{
     file_operations::FileOperationsInterest,
     find_lsp_workspace, jsonrpc,
-    transport::{Payload, Transport},
+    transport::{Payload, StderrTail, Transport},
     Call, Error, LanguageServerId, OffsetEncoding, Result,
 };
 use log::info;
@@ -108,6 +108,7 @@ pub struct Client {
     initialize_notify: Arc<Notify>,
     /// workspace folders added while the server is still initializing
     req_timeout: u64,
+    stderr_tail: StderrTail,
 }
 
 impl Client {
@@ -283,8 +284,15 @@ impl Client {
         let reader = BufReader::new(process.stdout.take().expect("Failed to open stdout"));
         let stderr = BufReader::new(process.stderr.take().expect("Failed to open stderr"));
 
-        let (server_rx, server_tx, initialize_notify) =
-            Transport::start(reader, writer, stderr, id, name.clone());
+        let stderr_tail = StderrTail::default();
+        let (server_rx, server_tx, initialize_notify) = Transport::start(
+            reader,
+            writer,
+            stderr,
+            id,
+            name.clone(),
+            stderr_tail.clone(),
+        );
 
         let workspace_folders = root_uri
             .clone()
@@ -305,6 +313,7 @@ impl Client {
             root_uri,
             workspace_folders: Mutex::new(workspace_folders),
             initialize_notify: initialize_notify.clone(),
+            stderr_tail,
         };
 
         Ok((client, server_rx, initialize_notify))
@@ -474,6 +483,11 @@ impl Client {
 
     pub fn server_pid(&self) -> Option<u32> {
         self._process.id()
+    }
+
+    /// The most recent lines the server wrote to stderr, oldest first.
+    pub fn stderr_tail(&self) -> Vec<String> {
+        self.stderr_tail.lock().iter().cloned().collect()
     }
 
     pub async fn workspace_folders(

@@ -157,6 +157,7 @@ where
         helix_view::editor::StatusLineElement::VersionControl => render_version_control,
         helix_view::editor::StatusLineElement::Register => render_register,
         helix_view::editor::StatusLineElement::CurrentWorkingDirectory => render_cwd,
+        helix_view::editor::StatusLineElement::LspHealth => render_lsp_health,
     }
 }
 
@@ -209,6 +210,26 @@ where
             .unwrap_or(" ")
             .into(),
     );
+}
+
+fn render_lsp_health<'a, F>(context: &mut RenderContext<'a>, write: F)
+where
+    F: Fn(&mut RenderContext<'a>, Span<'a>) + Copy,
+{
+    // Look at the configured servers rather than `doc.language_servers()`, since a crashed
+    // server has already been removed from the document.
+    let Some(language_config) = context.doc.language_config() else {
+        return;
+    };
+    for ls in &language_config.language_servers {
+        if context.editor.language_servers.failure(&ls.name).is_some() {
+            write(
+                context,
+                Span::styled("●", context.editor.theme.get("error")),
+            );
+            write(context, format!(" {} failed ", ls.name).into());
+        }
+    }
 }
 
 fn render_diagnostics<'a, F>(context: &mut RenderContext<'a>, write: F)
