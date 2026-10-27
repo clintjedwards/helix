@@ -14,7 +14,7 @@ use helix_core::{
     RopeSlice, Syntax,
 };
 use helix_view::{
-    graphics::{Margin, Rect, Style},
+    graphics::{Color, Margin, Rect, Style, UnderlineStyle},
     theme::Modifier,
     Theme,
 };
@@ -141,6 +141,9 @@ pub struct Markdown {
     contents: String,
 
     config_loader: Arc<ArcSwap<syntax::Loader>>,
+
+    /// Index into `links()` of the link to draw as selected, if any.
+    active_link: Option<usize>,
 }
 
 // TODO: pre-render and self reference via Pin
@@ -150,6 +153,8 @@ impl Markdown {
     const TEXT_STYLE: &'static str = "ui.text";
     const BLOCK_STYLE: &'static str = "markup.raw.inline";
     const RULE_STYLE: &'static str = "punctuation.special";
+    const LINK_STYLE: &'static str = "markup.link.text";
+    const ACTIVE_LINK_STYLE: &'static str = "ui.selection.primary";
     const UNNUMBERED_LIST_STYLE: &'static str = "markup.list.unnumbered";
     const NUMBERED_LIST_STYLE: &'static str = "markup.list.numbered";
     const HEADING_STYLES: [&'static str; 6] = [
@@ -166,10 +171,49 @@ impl Markdown {
         Self {
             contents,
             config_loader,
+            active_link: None,
         }
     }
 
+    /// Link destinations in the order they appear in the rendered text.
+    pub fn links(&self) -> Vec<String> {
+        Parser::new_ext(&self.contents, Options::ENABLE_STRIKETHROUGH)
+            .filter_map(|event| match event {
+                Event::Start(Tag::Link { dest_url, .. }) => Some(dest_url.into_string()),
+                _ => None,
+            })
+            .collect()
+    }
+
+    pub fn set_active_link(&mut self, index: Option<usize>) {
+        self.active_link = index;
+    }
+
     pub fn parse(&self, theme: Option<&Theme>) -> tui::text::Text<'_> {
+        self.parse_inner(theme, false)
+    }
+
+    /// Unstyled text where each link is colored with a marker that `link_at` turns back into
+    /// the link's index. Rendering this the same way as `parse` and reading the colors back
+    /// shows where each link landed after wrapping, which is how mouse clicks find links.
+    pub fn link_map(&self) -> tui::text::Text<'_> {
+        self.parse_inner(None, true)
+    }
+
+    /// The index into `links()` of the link drawn with `color` by `link_map`.
+    pub fn link_at(color: Color) -> Option<usize> {
+        match color {
+            Color::Rgb(r, g, b) => Some(u32::from_be_bytes([0, r, g, b]) as usize),
+            _ => None,
+        }
+    }
+
+    fn link_marker(index: usize) -> Style {
+        let [_, r, g, b] = (index as u32).to_be_bytes();
+        Style::default().fg(Color::Rgb(r, g, b))
+    }
+
+    fn parse_inner(&self, theme: Option<&Theme>, link_markers: bool) -> tui::text::Text<'_> {
         fn push_line<'a>(spans: &mut Vec<Span<'a>>, lines: &mut Vec<Spans<'a>>) {
             let spans = std::mem::take(spans);
             if !spans.is_empty() {
@@ -186,6 +230,8 @@ impl Markdown {
         let mut spans = Vec::new();
         let mut lines = Vec::new();
         let mut list_stack = Vec::new();
+        // Number of links started so far, used to match against `active_link`.
+        let mut link_count: usize = 0;
 
         let get_indent = |level: usize| {
             if level < 1 {
@@ -201,6 +247,12 @@ impl Markdown {
         let numbered_list_style = get_theme(Self::NUMBERED_LIST_STYLE);
         let unnumbered_list_style = get_theme(Self::UNNUMBERED_LIST_STYLE);
         let rule_style = get_theme(Self::RULE_STYLE);
+        // Underline links so they stand out even when the theme doesn't color them.
+        let link_style = Style {
+            underline_style: Some(UnderlineStyle::Line),
+            ..get_theme(Self::LINK_STYLE)
+        };
+        let active_link_style = link_style.patch(get_theme(Self::ACTIVE_LINK_STYLE));
         let heading_styles: Vec<Style> = Self::HEADING_STYLES
             .iter()
             .map(|key| get_theme(key))
@@ -224,6 +276,14 @@ impl Markdown {
         });
 
         for event in parser {
+            let in_link = tags.iter().any(|tag| matches!(tag, Tag::Link { .. }));
+            let link_patch = if link_markers {
+                Self::link_marker(link_count.saturating_sub(1))
+            } else if self.active_link == link_count.checked_sub(1) {
+                active_link_style
+            } else {
+                link_style
+            };
             match event {
                 Event::Start(Tag::List(list)) => {
                     // if the list stack is not empty this is a sub list, in that
@@ -266,6 +326,9 @@ impl Markdown {
                     spans.push(Span::styled(prefix, bullet_style));
                 }
                 Event::Start(tag) => {
+                    if matches!(tag, Tag::Link { .. }) {
+                        link_count += 1;
+                    }
                     tags.push(tag);
                     if spans.is_empty() && !list_stack.is_empty() {
                         // TODO: could push indent + 2 or 3 spaces to align with
@@ -324,11 +387,21 @@ impl Markdown {
                             }
                             _ => text_style,
                         };
+                        let style = if in_link {
+                            style.patch(link_patch)
+                        } else {
+                            style
+                        };
                         spans.push(Span::styled(text, style));
                     }
                 }
                 Event::Code(text) | Event::Html(text) => {
-                    spans.push(Span::styled(text, code_style));
+                    let style = if in_link {
+                        code_style.patch(link_patch)
+                    } else {
+                        code_style
+                    };
+                    spans.push(Span::styled(text, style));
                 }
                 Event::SoftBreak | Event::HardBreak => {
                     push_line(&mut spans, &mut lines);

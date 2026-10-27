@@ -28,7 +28,7 @@ use helix_view::{
 
 use crate::{
     compositor::{self, Compositor},
-    job::Callback,
+    job::{Callback, Jobs},
     ui::{self, overlay::overlaid, FileLocation, Picker, Popup, PromptEvent},
 };
 
@@ -86,6 +86,26 @@ fn lsp_location_to_location(
 struct SymbolInformationItem {
     location: Location,
     symbol: lsp::SymbolInformation,
+}
+
+impl SymbolInformationItem {
+    fn new(symbol: lsp::SymbolInformation, offset_encoding: OffsetEncoding) -> Option<Self> {
+        let uri = match Uri::try_from(&symbol.location.uri) {
+            Ok(uri) => uri,
+            Err(err) => {
+                log::warn!("discarding symbol with invalid URI: {err}");
+                return None;
+            }
+        };
+        Some(Self {
+            location: Location {
+                uri,
+                range: symbol.location.range,
+                offset_encoding,
+            },
+            symbol,
+        })
+    }
 }
 
 struct DiagnosticStyles {
@@ -479,23 +499,7 @@ pub fn workspace_symbol_picker(cx: &mut Context) {
 
                     let response: Vec<_> = symbols
                         .into_iter()
-                        .filter_map(|symbol| {
-                            let uri = match Uri::try_from(&symbol.location.uri) {
-                                Ok(uri) => uri,
-                                Err(err) => {
-                                    log::warn!("discarding symbol with invalid URI: {err}");
-                                    return None;
-                                }
-                            };
-                            Some(SymbolInformationItem {
-                                location: Location {
-                                    uri,
-                                    range: symbol.location.range,
-                                    offset_encoding,
-                                },
-                                symbol,
-                            })
-                        })
+                        .filter_map(|symbol| SymbolInformationItem::new(symbol, offset_encoding))
                         .collect();
 
                     anyhow::Ok(response)
@@ -1089,6 +1093,206 @@ pub fn hover(cx: &mut Context) {
     });
 }
 
+/// A symbol named by a link in LSP documentation, such as a Rust intra-doc link.
+#[derive(Debug, PartialEq, Eq)]
+struct DocLinkSymbol {
+    /// Path leading up to the symbol, e.g. `["demo", "cli"]` for `demo::cli::Autoconfig`.
+    /// For associated items this ends with the parent type.
+    path: Vec<String>,
+    name: String,
+}
+
+impl DocLinkSymbol {
+    /// rust-analyzer rewrites intra-doc links it can resolve into rustdoc URLs on docs.rs or
+    /// doc.rust-lang.org (even for local crates that were never published) and leaves the
+    /// ones it can't resolve as plain paths like `super::cli::Autoconfig`.
+    fn parse(target: &str) -> Option<Self> {
+        // Checking for "://" rather than parsing as a URL first, because a path like
+        // `crate::foo` is also a valid URL with the scheme "crate".
+        if target.contains("://") {
+            Self::from_rustdoc_url(&url::Url::parse(target).ok()?)
+        } else {
+            Self::from_path(target)
+        }
+    }
+
+    fn from_rustdoc_url(url: &url::Url) -> Option<Self> {
+        // Skip what comes before the crate name: `<crate>/<version>` on docs.rs and the
+        // release channel on doc.rust-lang.org.
+        let skip = match url.host_str()? {
+            "docs.rs" => 2,
+            "doc.rust-lang.org" => 1,
+            _ => return None,
+        };
+        let mut segments: Vec<&str> = url.path_segments()?.filter(|s| !s.is_empty()).collect();
+        let file = segments.pop()?;
+        let mut path: Vec<String> = segments.into_iter().skip(skip).map(String::from).collect();
+        let mut name = if file == "index.html" {
+            path.pop()?
+        } else {
+            // Item pages are named `<kind>.<name>.html`, e.g. `struct.Autoconfig.html`.
+            file.strip_suffix(".html")?.split_once('.')?.1.to_string()
+        };
+        // Associated items are anchors on their parent's page, e.g. `#method.go`.
+        if let Some((_kind, member)) = url.fragment().and_then(|f| f.split_once('.')) {
+            path.push(std::mem::replace(&mut name, member.to_string()));
+        }
+        Some(Self { path, name })
+    }
+
+    fn from_path(target: &str) -> Option<Self> {
+        let target = target.trim().trim_matches('`');
+        // Drop rustdoc disambiguators like `struct@Foo`, `foo()` and `foo!`.
+        let target = target.split_once('@').map_or(target, |(_, rest)| rest);
+        let target = target.trim_end_matches("()").trim_end_matches('!');
+
+        let mut path: Vec<String> = target
+            .split("::")
+            .filter(|segment| !matches!(*segment, "crate" | "self" | "super"))
+            .map(String::from)
+            .collect();
+        let is_ident = |segment: &String| {
+            !segment.is_empty() && segment.chars().all(|c| c.is_alphanumeric() || c == '_')
+        };
+        if !path.iter().all(is_ident) {
+            return None;
+        }
+        let name = path.pop()?;
+        Some(Self { path, name })
+    }
+
+    /// Workspace symbol queries to try in order. rust-analyzer understands qualified
+    /// `a::b::Name` queries and only searches dependencies when the query ends in `*`. Other
+    /// servers will most likely only answer the bare name, which is why it's tried last.
+    fn queries(&self) -> Vec<String> {
+        let mut queries = Vec::new();
+        if !self.path.is_empty() {
+            let qualified = format!("{}::{}", self.path.join("::"), self.name);
+            queries.push(qualified.clone());
+            queries.push(qualified + "*");
+        }
+        queries.push(self.name.clone());
+        queries.push(format!("{}*", self.name));
+        queries
+    }
+
+    /// Keeps symbols with exactly our name. When some of those also sit in the container we
+    /// expect (like the type a method belongs to), only those are kept. Of what's left, only
+    /// the symbols whose file path best matches our module path are kept. Popular types are
+    /// re-exported all over the place, and this is what picks
+    /// `std/src/collections/hash/map.rs` for `std::collections::hash::map::HashMap` over
+    /// hashbrown's copy and the `pub use` in `std::collections`.
+    fn matching(&self, items: Vec<SymbolInformationItem>) -> Vec<SymbolInformationItem> {
+        let (in_container, others): (Vec<_>, Vec<_>) = items
+            .into_iter()
+            .filter(|item| item.symbol.name == self.name)
+            .partition(|item| {
+                item.symbol.container_name.is_some()
+                    && item.symbol.container_name.as_ref() == self.path.last()
+            });
+        let mut items = if in_container.is_empty() {
+            others
+        } else {
+            in_container
+        };
+
+        let best = items.iter().map(|item| self.path_score(item)).max();
+        items.retain(|item| Some(self.path_score(item)) == best);
+        items
+    }
+
+    /// How many of our path segments show up as directories or the file name in the symbol's
+    /// location.
+    fn path_score(&self, item: &SymbolInformationItem) -> usize {
+        let Some(path) = item.location.uri.as_path() else {
+            return 0;
+        };
+        let parts: Vec<_> = path
+            .parent()
+            .into_iter()
+            .flat_map(Path::iter)
+            .chain(path.file_stem())
+            .collect();
+        self.path
+            .iter()
+            .filter(|segment| parts.contains(&std::ffi::OsStr::new(segment.as_str())))
+            .count()
+    }
+}
+
+/// Opens a documentation link in the browser, e.g. the doc.rust-lang.org page for a std item,
+/// for when the rendered docs are more useful than jumping to the source.
+pub fn open_doc_link_in_browser(editor: &mut Editor, jobs: &mut Jobs, target: String) {
+    match url::Url::parse(&target) {
+        Ok(url) if matches!(url.scheme(), "http" | "https") => {
+            jobs.callback(crate::open_external_url_callback(url))
+        }
+        _ => editor.set_error(format!("'{target}' doesn't link to a web page")),
+    }
+}
+
+/// Jumps to the symbol a documentation link points at, such as a link selected in a hover
+/// popup. Links that don't resolve to a symbol are opened as URLs instead.
+pub fn follow_doc_link(editor: &mut Editor, jobs: &mut Jobs, target: String) {
+    let doc = doc!(editor);
+    let rel_path = doc
+        .relative_path()
+        .and_then(|path| path.parent().map(Path::to_path_buf))
+        .unwrap_or_default();
+    let mut seen_language_servers = HashSet::new();
+    let language_servers: Vec<_> = doc
+        .language_servers_with_feature(LanguageServerFeature::WorkspaceSymbols)
+        .filter(|ls| seen_language_servers.insert(ls.id()))
+        .filter_map(|ls| editor.language_servers.get_by_id(ls.id()).cloned())
+        .collect();
+
+    let symbol = DocLinkSymbol::parse(&target);
+    let fallback =
+        move |editor: &mut Editor, compositor: &mut Compositor| match url::Url::parse(&target) {
+            Ok(url) if target.contains("://") => {
+                super::open_url_in_callback(editor, compositor, url, Action::Replace, &rel_path)
+            }
+            _ => editor.set_error(format!("No symbol found for '{target}'")),
+        };
+
+    let Some(symbol) = symbol.filter(|_| !language_servers.is_empty()) else {
+        jobs.callback(async move { Ok(Callback::EditorCompositor(Box::new(fallback))) });
+        return;
+    };
+
+    jobs.callback(async move {
+        // Queries run one after another since the later ones are broader and slower.
+        for query in symbol.queries() {
+            let mut items = Vec::new();
+            for language_server in &language_servers {
+                let offset_encoding = language_server.offset_encoding();
+                let Some(request) = language_server.workspace_symbols(query.clone()) else {
+                    continue;
+                };
+                match request.await {
+                    Ok(Some(lsp::WorkspaceSymbolResponse::Flat(symbols))) => {
+                        items.extend(symbols.into_iter().filter_map(|symbol| {
+                            SymbolInformationItem::new(symbol, offset_encoding)
+                        }))
+                    }
+                    Ok(_) => (),
+                    Err(err) => log::error!("Error requesting workspace symbols: {err}"),
+                }
+            }
+
+            let items = symbol.matching(items);
+            if !items.is_empty() {
+                let call = move |editor: &mut Editor, compositor: &mut Compositor| {
+                    let locations = items.into_iter().map(|item| item.location).collect();
+                    goto_impl(editor, compositor, locations);
+                };
+                return Ok(Callback::EditorCompositor(Box::new(call)));
+            }
+        }
+        Ok(Callback::EditorCompositor(Box::new(fallback)))
+    });
+}
+
 pub fn rename_symbol(cx: &mut Context) {
     fn get_prefill_from_word_boundary(editor: &Editor) -> String {
         let (view, doc) = current_ref!(editor);
@@ -1566,4 +1770,57 @@ pub fn lsp_info(cx: &mut Context) {
     });
 
     cx.push_layer(Box::new(overlaid(picker)));
+}
+
+#[cfg(test)]
+mod tests {
+    use super::DocLinkSymbol;
+
+    fn symbol(path: &[&str], name: &str) -> Option<DocLinkSymbol> {
+        Some(DocLinkSymbol {
+            path: path.iter().map(|s| s.to_string()).collect(),
+            name: name.to_string(),
+        })
+    }
+
+    #[test]
+    fn doc_link_from_rustdoc_url() {
+        assert_eq!(
+            DocLinkSymbol::parse("https://docs.rs/demo/0.1.0/demo/cli/struct.Autoconfig.html"),
+            symbol(&["demo", "cli"], "Autoconfig")
+        );
+        assert_eq!(
+            DocLinkSymbol::parse("https://doc.rust-lang.org/stable/alloc/vec/struct.Vec.html"),
+            symbol(&["alloc", "vec"], "Vec")
+        );
+        assert_eq!(
+            DocLinkSymbol::parse("https://docs.rs/demo/0.1.0/demo/cli/struct.Other.html#method.go"),
+            symbol(&["demo", "cli", "Other"], "go")
+        );
+        assert_eq!(
+            DocLinkSymbol::parse("https://docs.rs/demo/0.1.0/demo/cli/index.html"),
+            symbol(&["demo"], "cli")
+        );
+        assert_eq!(
+            DocLinkSymbol::parse("https://example.com/struct.Foo.html"),
+            None
+        );
+    }
+
+    #[test]
+    fn doc_link_from_path() {
+        assert_eq!(
+            DocLinkSymbol::parse("super::cli::Autoconfig"),
+            symbol(&["cli"], "Autoconfig")
+        );
+        assert_eq!(
+            DocLinkSymbol::parse("`cli::Other::go`"),
+            symbol(&["cli", "Other"], "go")
+        );
+        assert_eq!(DocLinkSymbol::parse(""), None);
+        assert_eq!(DocLinkSymbol::parse("struct@Foo"), symbol(&[], "Foo"));
+        assert_eq!(DocLinkSymbol::parse("crate::run()"), symbol(&[], "run"));
+        assert_eq!(DocLinkSymbol::parse("vec!"), symbol(&[], "vec"));
+        assert_eq!(DocLinkSymbol::parse("some text"), None);
+    }
 }

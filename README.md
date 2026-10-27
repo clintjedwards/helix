@@ -230,6 +230,19 @@ To turn it off for a single server, add `semantic-tokens` to that server's `exce
 </details>
 
 <details>
+<summary><strong>Follow links in hover docs</strong>: jump to items linked from documentation</summary>
+
+<br>
+
+Links in hover popups (`space k`) are underlined and can be followed. Click one with the mouse, or press `tab`/`shift-tab` to cycle through them and `enter` to follow the selected one. The mouse wheel scrolls the popup, and clicking inside it no longer closes it. Popups scrolled to the bottom also stay there now; before, the next redraw jumped back up a few lines.
+
+For Rust, an intra-doc link like ``[`Autoconfig`](super::cli::Autoconfig)`` jumps straight to the item's source, including items in dependencies and std. rust-analyzer turns these links into docs.rs URLs before sending them, even for crates that were never published, so the URL is mapped back to a path and looked up with a workspace symbol search. Popular types are re-exported in several places, so matches whose file path lines up with the link's module path win; `HashMap` goes to `std/src/collections/hash/map.rs` rather than hashbrown. If several symbols still match, a picker opens. Links that aren't symbols, or that can't be found, open in the browser.
+
+To read the rendered docs instead, for example the doc.rust-lang.org page for a std type, open the link in the browser with `alt-enter`, a middle-click, or a ctrl-click. Some terminals keep ctrl-click for themselves, which is why middle-click works too.
+
+</details>
+
+<details>
 <summary><strong>Different defaults</strong> — settings that differ from upstream out of the box</summary>
 
 <br>

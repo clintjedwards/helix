@@ -217,15 +217,31 @@ impl<T: Component> Popup<T> {
         }
     }
 
-    fn handle_mouse_event(
-        &mut self,
-        &MouseEvent {
+    fn handle_mouse_event(&mut self, event: &Event, cx: &mut Context) -> EventResult {
+        let Event::Mouse(MouseEvent {
             kind,
             column: x,
             row: y,
             ..
-        }: &MouseEvent,
-    ) -> EventResult {
+        }) = *event
+        else {
+            return EventResult::Ignored(None);
+        };
+
+        let mouse_is_within_popup = x >= self.area.left()
+            && x < self.area.right()
+            && y >= self.area.top()
+            && y < self.area.bottom();
+
+        // Clicks inside the popup go to the contents first so they can react to them, e.g. by
+        // following a link in hover docs.
+        if mouse_is_within_popup && matches!(kind, MouseEventKind::Down(_) | MouseEventKind::Up(_))
+        {
+            if let result @ EventResult::Consumed(_) = self.contents.handle_event(event, cx) {
+                return result;
+            }
+        }
+
         if self.auto_close && matches!(kind, MouseEventKind::Down(_)) {
             let close_fn: Callback = Box::new(|compositor, _| {
                 // remove the layer
@@ -234,11 +250,6 @@ impl<T: Component> Popup<T> {
 
             return EventResult::Ignored(Some(close_fn));
         }
-
-        let mouse_is_within_popup = x >= self.area.left()
-            && x < self.area.right()
-            && y >= self.area.top()
-            && y < self.area.bottom();
 
         if !mouse_is_within_popup {
             return EventResult::Ignored(None);
@@ -262,7 +273,7 @@ impl<T: Component> Component for Popup<T> {
     fn handle_event(&mut self, event: &Event, cx: &mut Context) -> EventResult {
         let key = match event {
             Event::Key(event) => *event,
-            Event::Mouse(event) => return self.handle_mouse_event(event),
+            Event::Mouse(_) => return self.handle_mouse_event(event, cx),
             Event::Resize(_, _) => {
                 // TODO: calculate inner area, call component's handle_event with that area
                 return EventResult::Ignored(None);
@@ -345,9 +356,11 @@ impl<T: Component> Component for Popup<T> {
         let max_offset = child_height.saturating_sub(inner.height) as usize;
         let half_page_size = (inner.height / 2) as usize;
         let scroll = max_offset.min(self.scroll_half_pages * half_page_size);
-        self.scroll_half_pages = scroll
-            .checked_div(half_page_size)
-            .unwrap_or(self.scroll_half_pages);
+        // Round up so a popup scrolled to the bottom stays there. The bottom usually isn't a whole
+        // number of half pages, and rounding down made the next render jump back up a few lines.
+        if half_page_size > 0 {
+            self.scroll_half_pages = scroll.div_ceil(half_page_size);
+        }
         cx.scroll = Some(scroll);
         self.contents.render(inner, surface, cx);
 
