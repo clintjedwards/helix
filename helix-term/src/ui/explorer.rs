@@ -5,6 +5,7 @@ use crate::{
 };
 use anyhow::{bail, ensure, Result};
 use helix_core::Position;
+use helix_stdx::path as hx_path;
 use helix_view::{
     editor::{Action, ExplorerPosition},
     graphics::{CursorKind, Rect},
@@ -14,7 +15,6 @@ use helix_view::{
     Editor,
 };
 use std::cmp::Ordering;
-use helix_stdx::path as hx_path;
 use std::path::{Path, PathBuf};
 use std::{borrow::Cow, fs::DirEntry};
 use tui::{
@@ -666,17 +666,15 @@ fn close_documents(current_item_path: PathBuf, cx: &mut Context) -> Result<()> {
         .collect::<Vec<_>>();
 
     for id in ids {
-        cx.editor
-            .close_document(id, true)
-            .map_err(|e| match e {
-                helix_view::editor::CloseError::DoesNotExist => {
-                    anyhow::anyhow!("document does not exist")
-                }
-                helix_view::editor::CloseError::BufferModified(name) => {
-                    anyhow::anyhow!("buffer modified: {name}")
-                }
-                helix_view::editor::CloseError::SaveError(err) => err,
-            })?;
+        cx.editor.close_document(id, true).map_err(|e| match e {
+            helix_view::editor::CloseError::DoesNotExist => {
+                anyhow::anyhow!("document does not exist")
+            }
+            helix_view::editor::CloseError::BufferModified(name) => {
+                anyhow::anyhow!("buffer modified: {name}")
+            }
+            helix_view::editor::CloseError::SaveError(err) => err,
+        })?;
     }
     Ok(())
 }

@@ -213,6 +213,24 @@ fn normalize_to_https(url: &str) -> String {
     url.to_string()
 }
 
+pub fn stage_paths(cwd: &Path, paths: &[&Path]) -> Result<()> {
+    // gix can't write the index yet, so shell out like the remote lookup below does.
+    let output = std::process::Command::new("git")
+        .arg("-C")
+        .arg(cwd)
+        .args(["add", "-A", "--"])
+        .args(paths)
+        .output()
+        .context("failed to run git")?;
+    if !output.status.success() {
+        bail!(
+            "git add failed: {}",
+            String::from_utf8_lossy(&output.stderr).trim()
+        );
+    }
+    Ok(())
+}
+
 pub fn get_permalink_url(
     file: &Path,
     start_line: usize,
@@ -225,10 +243,7 @@ pub fn get_permalink_url(
 
     let commit_hash = repo.head_commit()?.id.to_hex().to_string();
 
-    let work_dir = repo
-        .workdir()
-        .context("repo has no workdir")?
-        .to_path_buf();
+    let work_dir = repo.workdir().context("repo has no workdir")?.to_path_buf();
 
     let output = std::process::Command::new("git")
         .args(["config", "--get", "remote.origin.url"])

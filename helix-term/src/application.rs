@@ -649,6 +649,7 @@ impl Application {
             Ok(event) => event,
             Err(err) => {
                 self.editor.set_error(err.to_string());
+                crate::commands::diff_review::on_save_failed(&mut self.editor);
                 return;
             }
         };
@@ -710,6 +711,9 @@ impl Application {
             "'{}' written, {lines}L {size}",
             get_relative_path(&doc_save_event.path).to_string_lossy(),
         ));
+
+        // After the "written" status so an approve's own message isn't overwritten.
+        crate::commands::diff_review::on_document_saved(&mut self.editor, doc_save_event.doc_id);
 
         // Process any file events that were deferred while write_count > 0.
         // Now that last_saved_time is up to date, the mtime guard will correctly
@@ -1318,10 +1322,8 @@ impl Application {
             return;
         }
 
-        self.compositor.replace_or_push(
-            LspFailureNotice::ID,
-            LspFailureNotice::new(name, &failure),
-        );
+        self.compositor
+            .replace_or_push(LspFailureNotice::ID, LspFailureNotice::new(name, &failure));
     }
 
     fn handle_show_document(
@@ -1611,11 +1613,8 @@ impl Application {
                             .reload(view, &cx.editor.diff_providers)
                             .map(|_| view.ensure_cursor_in_view(doc, scrolloff))
                         {
-                            cx.editor
-                                .set_error(format!("Auto-reload failed: {err}"));
-                        } else if let Some(path) =
-                            doc!(cx.editor, &doc_id).path().cloned()
-                        {
+                            cx.editor.set_error(format!("Auto-reload failed: {err}"));
+                        } else if let Some(path) = doc!(cx.editor, &doc_id).path().cloned() {
                             cx.editor
                                 .language_servers
                                 .file_event_handler

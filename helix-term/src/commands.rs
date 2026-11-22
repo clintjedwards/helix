@@ -1,9 +1,11 @@
 pub(crate) mod dap;
+pub(crate) mod diff_review;
 pub(crate) mod lsp;
 pub(crate) mod syntax;
 pub(crate) mod typed;
 
 pub use dap::*;
+use diff_review::{diff_review_approve, diff_review_next_file, diff_review_prev_file};
 use futures_util::FutureExt;
 use helix_event::status;
 use helix_stdx::{
@@ -417,6 +419,9 @@ impl MappableCommand {
         syntax_symbol_picker, "Open symbol picker from syntax information",
         lsp_or_syntax_symbol_picker, "Open symbol picker from LSP or syntax information",
         changed_file_picker, "Open changed file picker",
+        diff_review_approve, "Approve the file under diff review (git add) and go to the next",
+        diff_review_next_file, "Go to the next file in the diff review",
+        diff_review_prev_file, "Go to the previous file in the diff review",
         git_permalink, "Copy GitHub permalink for current selection to clipboard",
         select_references_to_symbol_under_cursor, "Select symbol references",
         workspace_symbol_picker, "Open workspace symbol picker",
@@ -3737,9 +3742,7 @@ fn git_permalink(cx: &mut Context) {
 
     match helix_vcs::get_permalink_url(&path, start, end) {
         Ok(url) => match cx.editor.registers.write('+', vec![url.clone()]) {
-            Ok(_) => cx
-                .editor
-                .set_status(format!("Permalink copied: {}", url)),
+            Ok(_) => cx.editor.set_status(format!("Permalink copied: {}", url)),
             Err(err) => cx.editor.set_error(err.to_string()),
         },
         Err(err) => cx.editor.set_error(err.to_string()),

@@ -29,6 +29,13 @@ pub fn get_permalink_url(
     git::get_permalink_url(file, start_line, end_line)
 }
 
+/// Stages the given paths with `git add -A`, so deletions and the old side of a rename are
+/// staged along with new and modified files.
+#[cfg(feature = "git")]
+pub fn stage_paths(cwd: &Path, paths: &[&Path]) -> Result<()> {
+    git::stage_paths(cwd, paths)
+}
+
 /// Contains all active diff providers. Diff providers are compiled in via features. Currently
 /// only `git` is supported.
 #[derive(Clone)]
@@ -64,6 +71,34 @@ impl DiffProviderRegistry {
                     None
                 }
             })
+    }
+
+    /// Lists the files with unstaged changes, blocking until the status walk finishes. Unlike
+    /// [`Self::for_each_changed_file`] this fails on any error, since callers rely on getting
+    /// the complete list.
+    pub fn changed_files(&self, cwd: &Path) -> Result<Vec<FileChange>> {
+        let mut first_err = None;
+        for provider in &self.providers {
+            let changes = std::cell::RefCell::new(Vec::new());
+            let item_err = std::cell::RefCell::new(None);
+            let res = provider.for_each_changed_file(cwd, |change| match change {
+                Ok(change) => {
+                    changes.borrow_mut().push(change);
+                    true
+                }
+                Err(err) => {
+                    *item_err.borrow_mut() = Some(err);
+                    false
+                }
+            });
+            match res.and_then(|()| item_err.into_inner().map_or(Ok(()), Err)) {
+                Ok(()) => return Ok(changes.into_inner()),
+                Err(err) => {
+                    first_err.get_or_insert(err);
+                }
+            }
+        }
+        Err(first_err.unwrap_or_else(|| anyhow!("no diff provider returns success")))
     }
 
     /// Fire-and-forget changed file iteration. Runs everything in a background task. Keeps

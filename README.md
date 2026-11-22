@@ -160,6 +160,27 @@ The URL is displayed in the status bar after copying.
 </details>
 
 <details>
+<summary><strong>Diff review</strong> — walk through unstaged changes file by file and approve them (<code>:diff-review</code>)</summary>
+
+<br>
+
+Review a batch of uncommitted changes file by file. `:diff-review` opens the first file with unstaged changes at its first change, and a `[Review] n files left` badge shows up in the statusline. Edit as usual while reviewing. Approving a file runs `git add` on it and moves to the next one, and the review ends on its own once nothing unstaged is left.
+
+| Key / command       | Description                                                  |
+| ------------------- | ------------------------------------------------------------ |
+| `:diff-review`      | Start a review, or restart it from the top                   |
+| `]g` / `[g`         | Next / previous change in the current file                   |
+| `Space+v`           | Approve the file (saves it first if needed) and go to the next |
+| `]r` / `[r`         | Next / previous file in the review, without approving        |
+| `:diff-review-stop` | Stop reviewing                                               |
+
+The queue is re-read from `git status` on every step, so a file that changes again after you approved it comes back for another look. Deleted and binary files can't be opened, so a read-only placeholder buffer takes their place, saying what changed and listing the review keys. Approve or skip them like any other file. Approving a renamed file stages both sides of the rename. If a file was changed on disk after you loaded it, approving refuses to save over that change.
+
+Undo an approval with `git restore --staged <file>`; the file goes back into the queue.
+
+</details>
+
+<details>
 <summary><strong>Global indentation settings</strong> — set a default tab width and indent style for all files</summary>
 
 <br>

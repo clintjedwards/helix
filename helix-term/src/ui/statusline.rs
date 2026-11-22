@@ -63,6 +63,26 @@ pub fn render(context: &mut RenderContext, viewport: Rect, surface: &mut Surface
 
     let config = context.editor.config();
 
+    // Shown regardless of the configured elements, since it only appears while a review runs and
+    // is the only sign that one is.
+    if let Some(review) = &context.editor.diff_review {
+        let theme = &context.editor.theme;
+        let style = theme
+            .try_get("ui.statusline.review")
+            .unwrap_or_else(|| theme.get("ui.statusline.select"));
+        let files = if review.unreviewed == 1 {
+            "file"
+        } else {
+            "files"
+        };
+        let badge = format!(" [Review] {} {files} left ", review.unreviewed);
+        append(
+            &mut context.parts.left,
+            Span::styled(badge, style),
+            base_style,
+        );
+    }
+
     for element_id in &config.statusline.left {
         let render = get_render_function(*element_id);
         (render)(context, |context, span| {

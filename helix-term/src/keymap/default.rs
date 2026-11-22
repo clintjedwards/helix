@@ -115,6 +115,7 @@ pub fn default() -> HashMap<Mode, KeyTrie> {
             "d" => goto_prev_diag,
             "D" => goto_first_diag,
             "g" => goto_prev_change,
+            "r" => diff_review_prev_file,
             "G" => goto_first_change,
             "f" => goto_prev_function,
             "t" => goto_prev_class,
@@ -130,6 +131,7 @@ pub fn default() -> HashMap<Mode, KeyTrie> {
             "d" => goto_next_diag,
             "D" => goto_last_diag,
             "g" => goto_next_change,
+            "r" => diff_review_next_file,
             "G" => goto_last_change,
             "f" => goto_next_function,
             "t" => goto_next_class,
@@ -238,6 +240,7 @@ pub fn default() -> HashMap<Mode, KeyTrie> {
             "d" => diagnostics_picker,
             "D" => workspace_diagnostics_picker,
             "g" => changed_file_picker,
+            "v" => diff_review_approve,
             "a" => code_action,
             "'" => last_picker,
             "G" => { "Debug (experimental)" sticky=true

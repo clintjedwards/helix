@@ -160,8 +160,7 @@ impl SearchReplace {
                     continue;
                 }
 
-                let results =
-                    run_workspace_search(&search_root, &latest_query, &latest_opts);
+                let results = run_workspace_search(&search_root, &latest_query, &latest_opts);
                 let _ = rtx.send(results);
             }
         });
@@ -324,13 +323,11 @@ impl SearchReplace {
                     .unwrap_or(char_indices.len());
 
                 for _ in 0..rep {
-                    while char_pos < char_indices.len()
-                        && !char_indices[char_pos].1.is_whitespace()
+                    while char_pos < char_indices.len() && !char_indices[char_pos].1.is_whitespace()
                     {
                         char_pos += 1;
                     }
-                    while char_pos < char_indices.len()
-                        && char_indices[char_pos].1.is_whitespace()
+                    while char_pos < char_indices.len() && char_indices[char_pos].1.is_whitespace()
                     {
                         char_pos += 1;
                     }
@@ -356,7 +353,9 @@ impl SearchReplace {
             self.run_search_buffer(&text, doc_path);
         } else {
             let pattern = build_pattern(&self.search_input, &self.options);
-            let _ = self.query_tx.try_send(Some((pattern, self.options.clone())));
+            let _ = self
+                .query_tx
+                .try_send(Some((pattern, self.options.clone())));
             self.status = Some("Searching…".to_string());
         }
     }
@@ -411,7 +410,10 @@ impl SearchReplace {
                 line_content,
                 match_start_in_line,
                 match_end_in_line,
-                location: MatchLocation::BufferChars { char_start, char_end },
+                location: MatchLocation::BufferChars {
+                    char_start,
+                    char_end,
+                },
                 selected: true,
             });
         }
@@ -486,8 +488,15 @@ impl SearchReplace {
             let text = doc.text().clone();
 
             let (char_start, char_end) = match &result.location {
-                MatchLocation::BufferChars { char_start, char_end } => (*char_start, *char_end),
-                MatchLocation::FileBytes { line_num, line_byte_start, line_byte_end } => {
+                MatchLocation::BufferChars {
+                    char_start,
+                    char_end,
+                } => (*char_start, *char_end),
+                MatchLocation::FileBytes {
+                    line_num,
+                    line_byte_start,
+                    line_byte_end,
+                } => {
                     if *line_num < text.len_lines() {
                         let lcs = text.line_to_char(*line_num);
                         let ls = text.line(*line_num).to_string();
@@ -506,7 +515,11 @@ impl SearchReplace {
                 let replacement = self.compute_replacement_for(&matched_text);
                 let transaction = Transaction::change(
                     doc.text(),
-                    std::iter::once((char_start, char_end, Some(Tendril::from(replacement.as_str())))),
+                    std::iter::once((
+                        char_start,
+                        char_end,
+                        Some(Tendril::from(replacement.as_str())),
+                    )),
                 );
                 doc.apply(&transaction, view_id);
                 applied = true;
@@ -521,21 +534,23 @@ impl SearchReplace {
         }
 
         if applied {
-            self.status = Some(format!(
-                "Replaced 1 — {} remaining",
-                self.results.len()
-            ));
+            self.status = Some(format!("Replaced 1 — {} remaining", self.results.len()));
         }
 
         self.results.is_empty()
     }
 
     fn apply_replacements(&mut self, cx: &mut Context) {
-        let selected: Vec<SearchResult> =
-            self.results.iter().filter(|r| r.selected).cloned().collect();
+        let selected: Vec<SearchResult> = self
+            .results
+            .iter()
+            .filter(|r| r.selected)
+            .cloned()
+            .collect();
 
         if selected.is_empty() {
-            self.status = Some("Nothing selected — use [space] to select or [a] to select all".to_string());
+            self.status =
+                Some("Nothing selected — use [space] to select or [a] to select all".to_string());
             return;
         }
 
@@ -558,15 +573,19 @@ impl SearchReplace {
             matches.sort_unstable_by(|a, b| {
                 let a_key = match &a.location {
                     MatchLocation::BufferChars { char_start, .. } => *char_start,
-                    MatchLocation::FileBytes { line_num, line_byte_start, .. } => {
-                        line_num * 1_000_000 + line_byte_start
-                    }
+                    MatchLocation::FileBytes {
+                        line_num,
+                        line_byte_start,
+                        ..
+                    } => line_num * 1_000_000 + line_byte_start,
                 };
                 let b_key = match &b.location {
                     MatchLocation::BufferChars { char_start, .. } => *char_start,
-                    MatchLocation::FileBytes { line_num, line_byte_start, .. } => {
-                        line_num * 1_000_000 + line_byte_start
-                    }
+                    MatchLocation::FileBytes {
+                        line_num,
+                        line_byte_start,
+                        ..
+                    } => line_num * 1_000_000 + line_byte_start,
                 };
                 a_key.cmp(&b_key)
             });
@@ -593,9 +612,10 @@ impl SearchReplace {
 
             for result in &matches {
                 let (char_start, char_end) = match &result.location {
-                    MatchLocation::BufferChars { char_start, char_end } => {
-                        (*char_start, *char_end)
-                    }
+                    MatchLocation::BufferChars {
+                        char_start,
+                        char_end,
+                    } => (*char_start, *char_end),
                     MatchLocation::FileBytes {
                         line_num,
                         line_byte_start,
@@ -914,79 +934,77 @@ impl Component for SearchReplace {
 
         // ── Field-specific keys ────────────────────────────────────────────
         match self.focused {
-            FocusedField::Search | FocusedField::Replace => {
-                match event {
-                    key!(Enter) => {
-                        if self.scope == SearchScope::Buffer {
-                            let (_, doc) = current_ref!(cx.editor);
-                            let doc_path = doc.path().cloned().unwrap_or_default();
-                            let text = doc.text().clone();
-                            self.run_search_buffer(&text, doc_path);
-                        }
-                        if !self.results.is_empty() {
-                            self.focused = FocusedField::Results;
-                        }
+            FocusedField::Search | FocusedField::Replace => match event {
+                key!(Enter) => {
+                    if self.scope == SearchScope::Buffer {
+                        let (_, doc) = current_ref!(cx.editor);
+                        let doc_path = doc.path().cloned().unwrap_or_default();
+                        let text = doc.text().clone();
+                        self.run_search_buffer(&text, doc_path);
                     }
-                    ctrl!('s') => {
-                        self.scope = match self.scope {
-                            SearchScope::Buffer => SearchScope::Workspace,
-                            SearchScope::Workspace => SearchScope::Buffer,
-                        };
-                        self.results.clear();
-                        self.status = None;
-                        self.on_search_input_changed(cx);
+                    if !self.results.is_empty() {
+                        self.focused = FocusedField::Results;
                     }
-                    key!(Left) | ctrl!('b') => {
-                        let pos = self.eval_movement(Movement::BackwardChar(1));
-                        self.move_cursor_to(pos);
-                    }
-                    key!(Right) | ctrl!('f') => {
-                        let pos = self.eval_movement(Movement::ForwardChar(1));
-                        self.move_cursor_to(pos);
-                    }
-                    key!(Home) | ctrl!('a') => self.move_cursor_to(0),
-                    key!(End) | ctrl!('e') => {
-                        let end = self.active_input().len();
-                        self.move_cursor_to(end);
-                    }
-                    ctrl!(Left) | alt!('b') => {
-                        let pos = self.eval_movement(Movement::BackwardWord(1));
-                        self.move_cursor_to(pos);
-                    }
-                    ctrl!(Right) | alt!('f') => {
-                        let pos = self.eval_movement(Movement::ForwardWord(1));
-                        self.move_cursor_to(pos);
-                    }
-                    key!(Backspace) | ctrl!('h') => {
-                        self.delete_char_backwards();
-                        self.on_search_input_changed(cx);
-                    }
-                    key!(Delete) | ctrl!('d') => {
-                        self.delete_char_forwards();
-                        self.on_search_input_changed(cx);
-                    }
-                    ctrl!('w') => {
-                        self.delete_word_backwards();
-                        self.on_search_input_changed(cx);
-                    }
-                    ctrl!('k') => {
-                        self.kill_to_end();
-                        self.on_search_input_changed(cx);
-                    }
-                    ctrl!('u') => {
-                        self.kill_to_start();
-                        self.on_search_input_changed(cx);
-                    }
-                    KeyEvent {
-                        code: KeyCode::Char(c),
-                        modifiers: _,
-                    } => {
-                        self.insert_char_at_cursor(c);
-                        self.on_search_input_changed(cx);
-                    }
-                    _ => {}
                 }
-            }
+                ctrl!('s') => {
+                    self.scope = match self.scope {
+                        SearchScope::Buffer => SearchScope::Workspace,
+                        SearchScope::Workspace => SearchScope::Buffer,
+                    };
+                    self.results.clear();
+                    self.status = None;
+                    self.on_search_input_changed(cx);
+                }
+                key!(Left) | ctrl!('b') => {
+                    let pos = self.eval_movement(Movement::BackwardChar(1));
+                    self.move_cursor_to(pos);
+                }
+                key!(Right) | ctrl!('f') => {
+                    let pos = self.eval_movement(Movement::ForwardChar(1));
+                    self.move_cursor_to(pos);
+                }
+                key!(Home) | ctrl!('a') => self.move_cursor_to(0),
+                key!(End) | ctrl!('e') => {
+                    let end = self.active_input().len();
+                    self.move_cursor_to(end);
+                }
+                ctrl!(Left) | alt!('b') => {
+                    let pos = self.eval_movement(Movement::BackwardWord(1));
+                    self.move_cursor_to(pos);
+                }
+                ctrl!(Right) | alt!('f') => {
+                    let pos = self.eval_movement(Movement::ForwardWord(1));
+                    self.move_cursor_to(pos);
+                }
+                key!(Backspace) | ctrl!('h') => {
+                    self.delete_char_backwards();
+                    self.on_search_input_changed(cx);
+                }
+                key!(Delete) | ctrl!('d') => {
+                    self.delete_char_forwards();
+                    self.on_search_input_changed(cx);
+                }
+                ctrl!('w') => {
+                    self.delete_word_backwards();
+                    self.on_search_input_changed(cx);
+                }
+                ctrl!('k') => {
+                    self.kill_to_end();
+                    self.on_search_input_changed(cx);
+                }
+                ctrl!('u') => {
+                    self.kill_to_start();
+                    self.on_search_input_changed(cx);
+                }
+                KeyEvent {
+                    code: KeyCode::Char(c),
+                    modifiers: _,
+                } => {
+                    self.insert_char_at_cursor(c);
+                    self.on_search_input_changed(cx);
+                }
+                _ => {}
+            },
             FocusedField::Results => {
                 match event {
                     key!('j') | key!(Down) => {
@@ -1108,7 +1126,11 @@ impl Component for SearchReplace {
             } else {
                 format!(" {label} ({key}) ")
             };
-            let style = if *active { active_opt_style } else { inactive_opt_style };
+            let style = if *active {
+                active_opt_style
+            } else {
+                inactive_opt_style
+            };
             let (nx, _) = surface.set_stringn(x, opt_row, &btn, btn.len(), style);
             x = nx;
         }
@@ -1123,7 +1145,13 @@ impl Component for SearchReplace {
             .x
             .saturating_add(inner.width)
             .saturating_sub(scope_hint.len() as u16);
-        surface.set_stringn(hint_x, opt_row, &scope_hint, scope_hint.len() as usize, inactive_style);
+        surface.set_stringn(
+            hint_x,
+            opt_row,
+            &scope_hint,
+            scope_hint.len() as usize,
+            inactive_style,
+        );
 
         // ── Rows 1–2: search / replace inputs ─────────────────────────────
         let search_row = inner.y + 1;
@@ -1143,21 +1171,35 @@ impl Component for SearchReplace {
         // "Search: " / "Replace:"
         {
             let prefix = if search_focused { arrow_on } else { arrow_off };
-            let label_style = if search_focused { text_style } else { inactive_style };
+            let label_style = if search_focused {
+                text_style
+            } else {
+                inactive_style
+            };
             surface.set_stringn(inner.x, search_row, prefix, 2, label_style);
             surface.set_stringn(inner.x + 2, search_row, "Search: ", 8, label_style);
         }
         {
             let prefix = if replace_focused { arrow_on } else { arrow_off };
-            let label_style = if replace_focused { text_style } else { inactive_style };
+            let label_style = if replace_focused {
+                text_style
+            } else {
+                inactive_style
+            };
             surface.set_stringn(inner.x, replace_row, prefix, 2, label_style);
             surface.set_stringn(inner.x + 2, replace_row, "Replace:", 8, label_style);
         }
 
         // Input box background (slightly distinct — use statusline bg)
         let input_bg = statusline_style;
-        surface.clear_with(Rect::new(input_x, search_row, input_width as u16, 1), input_bg);
-        surface.clear_with(Rect::new(input_x, replace_row, input_width as u16, 1), input_bg);
+        surface.clear_with(
+            Rect::new(input_x, search_row, input_width as u16, 1),
+            input_bg,
+        );
+        surface.clear_with(
+            Rect::new(input_x, replace_row, input_width as u16, 1),
+            input_bg,
+        );
 
         render_input(
             surface,
@@ -1181,7 +1223,13 @@ impl Component for SearchReplace {
         // ── Row 3: divider ─────────────────────────────────────────────────
         let div_row = inner.y + 3;
         let divider = "─".repeat(inner.width as usize);
-        surface.set_stringn(inner.x, div_row, &divider, inner.width as usize, separator_style);
+        surface.set_stringn(
+            inner.x,
+            div_row,
+            &divider,
+            inner.width as usize,
+            separator_style,
+        );
 
         // ── Bottom 2 rows: separator + centered hint bar ──────────────────
         if inner.height <= 5 {
@@ -1221,7 +1269,11 @@ impl Component for SearchReplace {
         let w = inner.width as usize;
         let text_len = status_text.len().min(w);
         let padding = (w.saturating_sub(text_len)) / 2;
-        let centered = format!("{:>width$}", &status_text[..text_len], width = padding + text_len);
+        let centered = format!(
+            "{:>width$}",
+            &status_text[..text_len],
+            width = padding + text_len
+        );
         surface.set_stringn(inner.x, status_row, &centered, w, inactive_style);
 
         // ── Rows 4..(height-3): results list (left) + diff preview (right) ─
@@ -1231,7 +1283,9 @@ impl Component for SearchReplace {
 
         // Split horizontally: list gets ~38%, preview gets ~62%
         // (minimum 20 chars for list, rest for preview)
-        let list_width = ((inner.width as usize) * 38 / 100).max(20).min(inner.width as usize - 3);
+        let list_width = ((inner.width as usize) * 38 / 100)
+            .max(20)
+            .min(inner.width as usize - 3);
         let preview_x = inner.x + list_width as u16 + 1; // +1 for divider
         let preview_width = (inner.x + inner.width).saturating_sub(preview_x) as usize;
         let divider_x = inner.x + list_width as u16;
@@ -1257,7 +1311,11 @@ impl Component for SearchReplace {
         {
             let row = list_y + (i - scroll) as u16;
             let is_cursor = results_focused && i == cursor;
-            let row_bg = if is_cursor { cursor_row_style } else { background };
+            let row_bg = if is_cursor {
+                cursor_row_style
+            } else {
+                background
+            };
 
             surface.clear_with(Rect::new(inner.x, row, list_width as u16, 1), row_bg);
 
@@ -1267,7 +1325,11 @@ impl Component for SearchReplace {
             } else {
                 ("○ ", inactive_style)
             };
-            let ind_style = if is_cursor { row_bg.patch(ind_style) } else { ind_style };
+            let ind_style = if is_cursor {
+                row_bg.patch(ind_style)
+            } else {
+                ind_style
+            };
             surface.set_stringn(inner.x, row, indicator, 2, ind_style);
 
             // Path (truncated) + line number
@@ -1275,8 +1337,7 @@ impl Component for SearchReplace {
             let path_str = rel_path.to_string_lossy();
             let line_num_str = format!(":{}", result.line_num + 1);
             // Available width for path = list_width - 2 (indicator) - len(line_num_str) - 1 (space)
-            let path_avail = (list_width)
-                .saturating_sub(2 + line_num_str.len() + 1);
+            let path_avail = (list_width).saturating_sub(2 + line_num_str.len() + 1);
             let path_str = if path_str.len() > path_avail {
                 // Truncate from left with "…"
                 let keep = path_avail.saturating_sub(1);
@@ -1284,8 +1345,16 @@ impl Component for SearchReplace {
             } else {
                 path_str.to_string()
             };
-            let path_style = if is_cursor { row_bg.patch(inactive_style) } else { inactive_style };
-            let num_style = if is_cursor { row_bg.patch(text_style) } else { text_style };
+            let path_style = if is_cursor {
+                row_bg.patch(inactive_style)
+            } else {
+                inactive_style
+            };
+            let num_style = if is_cursor {
+                row_bg.patch(text_style)
+            } else {
+                text_style
+            };
             let (cx2, _) = surface.set_stringn(inner.x + 2, row, &path_str, path_avail, path_style);
             surface.set_stringn(cx2, row, &line_num_str, line_num_str.len(), num_style);
         }
@@ -1297,7 +1366,11 @@ impl Component for SearchReplace {
             let bar_top = scroll * list_height / total;
             let bar_x = inner.x + list_width as u16 - 1;
             for dy in 0..list_height {
-                let c = if dy >= bar_top && dy < bar_top + bar_h { "▐" } else { " " };
+                let c = if dy >= bar_top && dy < bar_top + bar_h {
+                    "▐"
+                } else {
+                    " "
+                };
                 surface.set_stringn(bar_x, list_y + dy as u16, c, 1, inactive_style);
             }
         }

@@ -1286,6 +1286,21 @@ use futures_util::stream::{Flatten, Once};
 
 type Diagnostics = BTreeMap<Uri, Vec<(lsp::Diagnostic, DiagnosticProvider)>>;
 
+/// An active `:diff-review`. The queue itself isn't stored; it's re-read from git on every step
+/// so changes made outside the editor are picked up.
+#[derive(Debug, Clone)]
+pub struct DiffReview {
+    /// The file under review, as a canonical path.
+    pub current: PathBuf,
+    /// How many files still have unstaged changes, for the statusline.
+    pub unreviewed: usize,
+    /// Set when approving had to save the buffer first. The file is staged once that save lands.
+    pub pending_approve: Option<DocumentId>,
+    /// The read-only note shown in place of a file that can't be opened (deleted, binary). It's
+    /// closed once the review moves on.
+    pub placeholder: Option<DocumentId>,
+}
+
 pub struct Editor {
     /// Current editing mode.
     pub mode: Mode,
@@ -1307,6 +1322,8 @@ pub struct Editor {
     pub language_servers: helix_lsp::Registry,
     pub diagnostics: Diagnostics,
     pub diff_providers: DiffProviderRegistry,
+    /// Set while a `:diff-review` is running.
+    pub diff_review: Option<DiffReview>,
 
     pub debug_adapters: dap::registry::Registry,
     pub breakpoints: HashMap<PathBuf, Vec<Breakpoint>>,
@@ -1460,6 +1477,7 @@ impl Editor {
             language_servers,
             diagnostics: Diagnostics::new(),
             diff_providers: DiffProviderRegistry::default(),
+            diff_review: None,
             debug_adapters: dap::registry::Registry::new(),
             breakpoints: HashMap::new(),
             syn_loader,
@@ -2019,7 +2037,7 @@ impl Editor {
         id
     }
 
-    fn new_file_from_document(&mut self, action: Action, doc: Document) -> DocumentId {
+    pub fn new_file_from_document(&mut self, action: Action, doc: Document) -> DocumentId {
         let id = self.new_document(doc);
         self.switch(id, action);
         id

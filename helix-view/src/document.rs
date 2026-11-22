@@ -2019,12 +2019,7 @@ impl Document {
                 self.language_config()
                     .and_then(|config| config.indent.as_ref())
                     .map_or_else(
-                        || {
-                            self.config
-                                .load()
-                                .tab_width
-                                .unwrap_or(DEFAULT_TAB_WIDTH)
-                        },
+                        || self.config.load().tab_width.unwrap_or(DEFAULT_TAB_WIDTH),
                         |config| config.tab_width,
                     )
             })
