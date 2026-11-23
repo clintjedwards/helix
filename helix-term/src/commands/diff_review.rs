@@ -229,7 +229,10 @@ fn goto_first_change(editor: &mut Editor) -> bool {
     // Center the whole change rather than the cursor. A change taller than the window is pinned
     // near the top instead, so the cursor at its start stays on screen.
     let text = doc.text().slice(..);
-    let change_lines = text.char_to_line(range.to()) - text.char_to_line(start);
+    // A deletion at the end of the file is a one char range starting at the end of the text, so
+    // its end is past the last char.
+    let end = range.to().min(text.len_chars());
+    let change_lines = text.char_to_line(end) - text.char_to_line(start);
     let viewport = view.inner_area(doc);
     let rows_above = (viewport.height.saturating_sub(1) as usize / 2)
         .saturating_sub(change_lines / 2)
